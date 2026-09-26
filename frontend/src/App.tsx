@@ -1,0 +1,203 @@
+import { useEffect, useState } from 'react'
+import { api } from './api'
+import type { AnalysisResult, Health, Stats } from './types'
+import { AlertTable } from './components/AlertTable'
+import { KpiCards, SeverityDistribution, StatusDistribution } from './components/Cards'
+import { HowItWorks } from './components/HowItWorks'
+import { Investigation } from './components/Investigation'
+import { Logo } from './components/Logo'
+import { TriageModal } from './components/TriageModal'
+
+export default function App() {
+  const [openId, setOpenId] = useState<string | null>(
+    () => window.location.hash.replace(/^#/, '') || null,
+  )
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [health, setHealth] = useState<Health | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [triageOpen, setTriageOpen] = useState(false)
+  const [howOpen, setHowOpen] = useState(false)
+  const [lastTriage, setLastTriage] = useState<AnalysisResult | null>(null)
+  const [simulating, setSimulating] = useState(false)
+  const [simError, setSimError] = useState<string | null>(null)
+
+  const open = (id: string) => {
+    window.location.hash = id
+    setOpenId(id)
+  }
+  const close = () => {
+    window.location.hash = ''
+    setOpenId(null)
+  }
+  useEffect(() => {
+    const onHash = () => setOpenId(window.location.hash.replace(/^#/, '') || null)
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+
+  const refresh = () => setRefreshKey((k) => k + 1)
+
+  useEffect(() => {
+    api
+      .stats()
+      .then(setStats)
+      .catch(() => setStats(null))
+    api
+      .health()
+      .then(setHealth)
+      .catch(() => setHealth(null))
+  }, [refreshKey])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      api
+        .stats()
+        .then(setStats)
+        .catch(() => setStats(null))
+      api
+        .health()
+        .then(setHealth)
+        .catch(() => setHealth(null))
+    }, 15000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const simulate = async () => {
+    setSimulating(true)
+    setSimError(null)
+    try {
+      const a = await api.simulate()
+      setOpenId(a.id)
+      window.location.hash = a.id
+      refresh()
+    } catch (e: unknown) {
+      setSimError(e instanceof Error ? e.message : 'Simulation failed')
+    } finally {
+      setSimulating(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-10 border-b border-cinder-border bg-cinder-bg/95 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3 px-4 sm:py-4">
+          <div className="flex items-center gap-3">
+            <Logo size={32} />
+            <div>
+              <div className="text-sm font-semibold tracking-wide">CINDER</div>
+              <div className="text-[11px] text-cinder-muted hidden sm:block">
+                AI-Powered SOC Analyst Copilot
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-cinder-muted sm:gap-4">
+            <button
+              onClick={() => setHowOpen(true)}
+              className="rounded border border-cinder-border px-3 py-1.5 text-xs font-medium text-cinder-text hover:border-cinder-text/60"
+            >
+              How it works
+            </button>
+            <button
+              onClick={simulate}
+              disabled={simulating}
+              className="rounded border border-cinder-border px-3 py-1.5 text-xs font-medium text-cinder-text hover:border-emerald-400/50 hover:text-emerald-400 disabled:opacity-50"
+            >
+              {simulating ? 'Simulating…' : 'Simulate alert'}
+            </button>
+            <button
+              onClick={() => setTriageOpen(true)}
+              className="rounded border border-cinder-border px-3 py-1.5 text-xs font-medium text-cinder-text hover:border-red-400/40 hover:text-red-400"
+            >
+              Triage log
+            </button>
+            <span className="hidden md:inline">v{health?.version ?? '0.1.0'}</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                className={
+                  health?.ai_configured
+                    ? 'h-2 w-2 rounded-full bg-emerald-400'
+                    : 'h-2 w-2 rounded-full bg-yellow-400'
+                }
+              />
+              {health?.ai_configured ? 'AI connected' : 'Fallback mode'}
+            </span>
+          </div>
+        </div>
+      </header>
+
+      {(triageOpen || howOpen) && (
+        <>
+          {triageOpen && (
+            <TriageModal
+              onClose={() => setTriageOpen(false)}
+              onResult={(r) => setLastTriage(r)}
+            />
+          )}
+          {howOpen && <HowItWorks onClose={() => setHowOpen(false)} />}
+        </>
+      )}
+
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        {openId ? (
+          <Investigation
+            alertId={openId}
+            onBack={close}
+            onStatusChange={refresh}
+          />
+        ) : (
+          <div className="flex flex-col gap-4">
+            <KpiCards stats={stats} />
+            {lastTriage && (
+              <div className="rounded-lg border border-cinder-border bg-cinder-panel p-3 text-sm">
+                <span className="text-[11px] uppercase tracking-wider text-cinder-muted">
+                  Last triaged log: </span>
+                <span className="font-semibold text-cinder-text">{lastTriage.threat_type}</span>
+                <span className="mx-2 text-cinder-muted">·</span>
+                <span
+                  className={
+                    lastTriage.severity === 'CRITICAL' || lastTriage.severity === 'HIGH'
+                      ? 'text-red-400'
+                      : lastTriage.severity === 'MEDIUM'
+                        ? 'text-yellow-400'
+                        : 'text-sky-400'
+                  }
+                >
+                  {lastTriage.severity}
+                </span>
+                <span className="mx-2 text-cinder-muted">·</span>
+                <span
+                  className={
+                    lastTriage.analysis_mode === 'ai' ? 'text-emerald-400' : 'text-yellow-400'
+                  }
+                >
+                  {lastTriage.analysis_mode === 'ai' ? 'live AI' : 'fallback'}
+                </span>
+              </div>
+            )}
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <AlertTable onOpen={open} refreshKey={refreshKey} />
+              </div>
+              <div className="flex flex-col gap-4">
+                <SeverityDistribution stats={stats} />
+                <StatusDistribution stats={stats} />
+              </div>
+            </div>
+          </div>
+        )}
+        {simError && (
+          <div className="mt-4 text-center text-xs text-red-400">{simError}</div>
+        )}
+      </main>
+
+      <footer className="border-t border-cinder-border py-5">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 text-[11px] text-cinder-muted">
+          <span>Built for GOMYCODE × NVIDIA Hackathon 2026 · FastAPI + React · so-called security</span>
+          <span className="inline-flex items-center gap-1.5">
+            Deterministic engine + Gemini · demo data uses RFC 5737 TEST-NET IPs
+          </span>
+        </div>
+      </footer>
+    </div>
+  )
+}

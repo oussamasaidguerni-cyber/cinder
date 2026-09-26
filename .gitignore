@@ -1,0 +1,18 @@
+# dependencies
+frontend/node_modules/
+frontend/dist/
+
+# backend runtime
+backend/data/*.db
+backend/data/*.db-*
+
+# env / secrets
+.env
+backend/.env
+
+# python
+__pycache__/
+*.pyc
+
+# os
+.DS_Store

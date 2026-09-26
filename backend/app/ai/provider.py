@@ -1,0 +1,185 @@
+"""AI provider abstraction.
+
+CINDER treats the AI as a narrative helper, NOT a decision-maker. The
+deterministic engine produces the verdict; the AI only phrases the summary,
+recommended actions, false-positive indicators, and incident report.
+
+`enrich()` returns NarrativeEnrichment; any failure raises AIError so the
+caller can fall back to deterministic output.
+"""
+
+import json
+import os
+import time
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
+
+from ..schemas.analysis import AnalysisResult
+from .prompts import build_enrichment_prompt, build_question_prompt
+
+GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
+
+
+class AIError(Exception):
+    """Raised when the AI provider fails for any reason."""
+
+
+@dataclass
+class NarrativeEnrichment:
+    summary: str
+    recommended_actions: list[str]
+    false_positive_indicators: list[str]
+    incident_report: str
+
+
+class BaseProvider:
+    name = "base"
+    model_name = "base"
+
+    def is_configured(self) -> bool:
+        raise NotImplementedError
+
+    def enrich(self, alert, result: AnalysisResult) -> NarrativeEnrichment:
+        raise NotImplementedError
+
+    def answer(self, alert, result: AnalysisResult, question: str) -> str:
+        raise NotImplementedError
+
+
+class GeminiProvider(BaseProvider):
+    """Calls the Gemini REST API via urllib (no SDK dependency)."""
+
+    name = "gemini"
+
+    def __init__(self, api_key: str, model: str) -> None:
+        self._api_key = api_key
+        self._model = model
+        self.model_name = model
+
+    def is_configured(self) -> bool:
+        return bool(self._api_key)
+
+    def enrich(self, alert, result: AnalysisResult) -> NarrativeEnrichment:
+        prompt = build_enrichment_prompt(alert, result)
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.3,
+                "maxOutputTokens": 1024,
+                "responseMimeType": "application/json",
+            },
+        }
+        body = self._call_gemini(payload)
+        try:
+            text = body["candidates"][0]["content"]["parts"][0]["text"]
+            parsed = json.loads(text)
+        except (KeyError, IndexError, json.JSONDecodeError) as exc:
+            raise AIError("Gemini returned an unexpected or non-JSON payload.") from exc
+
+        return self._validate(parsed)
+
+    def answer(self, alert, result: AnalysisResult, question: str) -> str:
+        payload = {
+            "contents": [{"parts": [{"text": build_question_prompt(alert, result, question)}]}],
+            "generationConfig": {
+                "temperature": 0.4,
+                "maxOutputTokens": 512,
+            },
+        }
+        body = self._call_gemini(payload)
+        try:
+            text = body["candidates"][0]["content"]["parts"][0]["text"].strip()
+        except (KeyError, IndexError) as exc:
+            raise AIError("Gemini returned an unexpected or non-JSON payload.") from exc
+        if not text:
+            raise AIError("Gemini returned an empty answer.")
+        return text
+
+    def _call_gemini(self, payload: dict) -> dict:
+        """POST to Gemini, retrying transient 429/5xx responses with backoff.
+
+        Gemini is known to return 429 (rate limit) and 503 (throttled spike)
+        under load. Retrying a few times with short backoff gives the demo a
+        much higher chance of a live result instead of an instant fallback.
+        """
+        url = f"{GEMINI_API_URL}/{self._model}:generateContent"
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode(),
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": self._api_key,
+            },
+        )
+        last_error: Exception | None = None
+        for attempt in range(4):
+            try:
+                with urllib.request.urlopen(req, timeout=30) as resp:
+                    return json.loads(resp.read().decode())
+            except urllib.error.HTTPError as exc:
+                # 429 and 5xx are transient; 4xx (except 429) is a real error.
+                if exc.code in (429, 500, 502, 503) and attempt < 3:
+                    last_error = exc
+                    time.sleep(1.5 * (attempt + 1))
+                    continue
+                raise AIError(f"Gemini HTTP {exc.code}: {exc.read().decode()[:200]}") from exc
+            except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+                raise AIError(f"Gemini request failed: {exc}") from exc
+        raise AIError(f"Gemini request failed: {last_error}") from last_error
+
+    @staticmethod
+    def _validate(parsed: dict) -> NarrativeEnrichment:
+        summary = str(parsed.get("summary", "")).strip()
+        if not summary:
+            raise AIError("AI returned an empty summary.")
+        actions = parsed.get("recommended_actions", [])
+        fps = parsed.get("false_positive_indicators", [])
+        report = str(parsed.get("incident_report", "")).strip()
+        if not isinstance(actions, list) or not isinstance(fps, list):
+            raise AIError("AI returned non-list narrative fields.")
+        return NarrativeEnrichment(
+            summary=summary,
+            recommended_actions=[str(a) for a in actions] or [],
+            false_positive_indicators=[str(f) for f in fps] or [],
+            incident_report=report,
+        )
+
+
+class MockProvider(BaseProvider):
+    """Fallback when no API key is configured. Labels itself as demo.
+
+    Uses the deterministic engine's own narrative so the demo flows
+    identically, but is clearly marked analysis_mode="fallback".
+    """
+
+    name = "fallback"
+
+    def is_configured(self) -> bool:
+        return True
+
+    def enrich(self, alert, result: AnalysisResult) -> NarrativeEnrichment:
+        return NarrativeEnrichment(
+            summary=result.summary,
+            recommended_actions=result.recommended_actions,
+            false_positive_indicators=result.false_positive_indicators,
+            incident_report=result.incident_report,
+        )
+
+    def answer(self, alert, result: AnalysisResult, question: str) -> str:
+        return (
+            "Fallback (demo) mode — live AI is not configured. Grounding your "
+            "question in what the deterministic engine found: "
+            f"{result.threat_type}, severity {result.severity} (confidence "
+            f"{result.confidence}%). Recommended next step: "
+            f"{result.recommended_actions[0] if result.recommended_actions else 'review the alert.'} "
+            "Add a GEMINI_API_KEY to get live answers to questions like yours."
+        )
+
+
+def get_provider() -> BaseProvider:
+    key = os.environ.get("GEMINI_API_KEY", "").strip()
+    model = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
+    if key:
+        return GeminiProvider(api_key=key, model=model)
+    return MockProvider()

@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cinder-bg: #0a0e0f;
+  --color-cinder-panel: #11181a;
+  --color-cinder-border: #1e2a2d;
+  --color-cinder-text: #dbe4e6;
+  --color-cinder-muted: #7d8b8e;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100vh;
+  background-color: var(--color-cinder-bg);
+  color: var(--color-cinder-text);
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
