@@ -132,6 +132,28 @@ frontend/src/
 
 Interactive docs: http://127.0.0.1:8000/docs
 
+## Deploy to the public web (Render, free)
+
+The whole app is one service: FastAPI serves the built React site. No laptop,
+no tunnel, no localhost — a permanent URL reachable from everywhere.
+
+1. Push this repo to GitHub (done — `github.com/oussamasaidguerni-cyber/cinder`).
+2. Sign in at https://render.com (free, no card).
+3. **New + → Blueprint → Public Repo** → pick this repo → **Apply**.
+   `render.yaml` handles the rest (installs deps, builds the frontend,
+   `GEMINI_MODEL` preloaded).
+4. In the service's **Environment** tab, set `GEMINI_API_KEY` to your key and
+   save — until then the app runs in honest fallback mode.
+5. Done: you get a permanent URL like `https://cinder.onrender.com`.
+
+Notes:
+
+- Free tier sleeps after ~15 min idle; the first load after sleep takes ~30-60s
+  to wake, then it's fast. A free uptime ping keeps it warm.
+- Ephemeral disk: the demo DB reseeds to the 5 alerts on each fresh boot.
+- Verify live status at `<your-url>/health` (`ai_configured` shows if the key
+  is set).
+
 ## Security notes
 
 - Binds to `127.0.0.1` by default; CORS locked to the Vite origin.
