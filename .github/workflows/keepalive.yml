@@ -1,0 +1,13 @@
+name: keepalive
+
+on:
+  schedule:
+    - cron: '*/8 * * * *'
+  workflow_dispatch:
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping CINDER health
+        run: curl -sS -o /dev/null -w "keepalive: %{http_code} in %{time_total}s\n" "https://cinder-4enr.onrender.com/health"
