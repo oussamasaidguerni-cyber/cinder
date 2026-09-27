@@ -44,14 +44,22 @@ frontend dev server is skipped and the API is browsable at
 
 ## AI setup (optional)
 
-Copy `backend/.env.example` to `backend/.env` and set a Gemini API key:
+CINDER prefers an AI provider in this order: **NVIDIA NIM** (build.nvidia.com)
+→ **Gemini** → honest deterministic fallback. Set whichever key you have in
+`backend/.env` (copy from `backend/.env.example`):
 
 ```
+NVIDIA_API_KEY=...
+NVIDIA_MODEL=nvidia/llama-3.1-nemotron-nano-8b-v1
 GEMINI_API_KEY=...
 GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
-- With a key: responses are labeled `Live AI analysis (Gemini)`.
+- With a key: responses are labeled `Live AI analysis` and show the exact model
+  that ran (e.g. `nvidia/llama-3.1-nemotron-nano-8b-v1`).
+- The NVIDIA provider calls an OpenAI-compatible NIM endpoint
+  (`https://integrate.api.nvidia.com/v1/chat/completions`); upgrade the model
+  whenever you like without touching the pipeline.
 - Without a key (or if calls fail): the deterministic engine answers and
   results are clearly labeled `Fallback mode` / `Deterministic engine`.
 - The AI is never allowed to change the severity/verdict — it only improves the
