@@ -192,6 +192,46 @@ Notes:
 - Verify live status at `<your-url>/health` (`ai_configured` shows if the key
   is set).
 
+## Testing + reliability
+
+```bash
+cd backend && python -m pytest -q
+```
+
+The suite (currently 15 tests) asserts the two promises that make it safe to
+trust:
+
+- **The Auditor finds the right things and nothing else.** The seeded synthetic
+  trail must produce exactly the five signature failure classes — no false
+  positives on the clean sessions, recoveries kept out of the failure list,
+  evidence quoting the foreign record, and groups ranked by score.
+- **The AI can fail and the demo still works.** No keys → honest
+  `fallback/deterministic` labels; a configured-but-failing provider → a
+  complete engine verdict with `analysis_mode="fallback"`; NVIDIA takes
+  precedence over Gemini; `NVIDIA_MODEL` overrides the default.
+
+Operating notes: provider calls retry 429/5xx with backoff; every AI result
+carries its real provider/mode label; detection runtime and LLM token cost are
+printed in the Auditor's honesty panel; deterministic detection makes zero
+network calls.
+
+## Responsible AI + data
+
+- **Fabricated data only** — every alert and the entire audit trail are synthetic
+  (RFC 5737 TEST-NET IP ranges, no real infrastructure, credentials, malware or
+  attack systems). It is labeled "demo data" in the app.
+- **Human oversight** — the deterministic engine owns every verdict; the AI may
+  only phrase the narrative and never the decision. Analysts set workflow status
+  and review ambiguous cases explicitly surfaced by the Auditor. The Auditor
+  states what it cannot detect.
+- **Safety-first outputs** — recommended actions are defensive and non-destructive
+  only; no exploit, disable or third-party-attack suggestions.
+- **Privacy** — keys live only in backend env vars, never shipped to the browser;
+  logs/narrative are rendered as escaped text, never executed.
+- **Bias & hallucination controls** — low-temperature prompts, strict JSON schema
+  with validation before use, and honest `ai` / `fallback` / `deterministic`
+  labels on every result so no unsupported claim can pass as a live decision.
+
 ## Security notes
 
 - Binds to `127.0.0.1` by default; CORS locked to the Vite origin.

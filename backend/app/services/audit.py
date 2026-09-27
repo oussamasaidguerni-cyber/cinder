@@ -490,17 +490,17 @@ def _ai_insights(groups: list[AuditGroup]) -> tuple[list[AuditInsight], int, str
     return insights, len(insights), provider.model_name
 
 
-def record_run(entry: AuditEntry) -> None:
+def record_run(entry: AuditEntry, db_path: str | None = None) -> None:
     """Append one agent run to the shared audit trail (live ingestion)."""
-    store = AlertStore("data/cinder.db")
+    store = AlertStore(db_path or "data/cinder.db")
     try:
         store.insert_audit(entry)
     finally:
         store.close()
 
 
-def build_trail(ai_pass: bool = False) -> AuditTrailResponse:
-    store = AlertStore("data/cinder.db")
+def build_trail(ai_pass: bool = False, db_path: str | None = None) -> AuditTrailResponse:
+    store = AlertStore(db_path or "data/cinder.db")
     try:
         try:
             entries = store.list_audit()
