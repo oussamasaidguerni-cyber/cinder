@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { api } from './api'
 import type { AnalysisResult, CorrelatedIncident, Health, Stats } from './types'
 import { AlertTable } from './components/AlertTable'
@@ -17,7 +17,46 @@ const AI_PROVIDER_LABEL: Record<string, string> = {
   fallback: 'deterministic engine',
 }
 
+function IntroSplash() {
+  const bootLines = useMemo(
+    () => [
+      'Initializing SOC console…',
+      'Loading alert queue…',
+      'Grounding threat intel: NVD · CISA KEV · MITRE ATT&CK…',
+      'Linking NVIDIA NIM…',
+      'Ready.',
+    ],
+    [],
+  )
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 bg-cinder-bg">
+      <div className="cinder-splash-logo">
+        <Logo size={72} />
+      </div>
+      <div className="cinder-splash-title">
+        <span className="text-3xl font-semibold tracking-[0.35em] text-cinder-text">
+          CINDER
+        </span>
+      </div>
+      <div className="flex w-72 flex-col gap-1.5 font-mono text-xs text-cinder-muted">
+        {bootLines.map((line, i) => (
+          <div key={line} className={`cinder-boot-line`} style={{ animationDelay: `${0.25 * i}s` }}>
+            <span className="text-red-400/80">&gt;&nbsp;</span>
+            {line}
+          </div>
+        ))}
+      </div>
+      <div className="cinder-splash-bar mt-2 h-px w-72 overflow-hidden rounded bg-cinder-border">
+        <div className="h-full bg-red-400" />
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
+  const [introDone, setIntroDone] = useState(
+    () => (typeof window !== 'undefined' && sessionStorage.getItem('cinder_intro') === 'done') || false,
+  )
   const [openId, setOpenId] = useState<string | null>(
     () => window.location.hash.replace(/^#/, '') || null,
   )
@@ -35,6 +74,16 @@ export default function App() {
   const [corrError, setCorrError] = useState<string | null>(null)
   const [auditorOpen, setAuditorOpen] = useState(false)
   const [intelOpen, setIntelOpen] = useState(false)
+
+  useEffect(() => {
+    if (!introDone) {
+      const t = window.setTimeout(() => {
+        sessionStorage.setItem('cinder_intro', 'done')
+        setIntroDone(true)
+      }, 3300)
+      return () => window.clearTimeout(t)
+    }
+  }, [introDone])
 
   const open = (id: string) => {
     window.location.hash = id
@@ -122,6 +171,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
+      {!introDone && <IntroSplash />}
       <header className="sticky top-0 z-10 border-b border-cinder-border bg-cinder-bg/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3 px-4 sm:py-4">
           <div className="flex items-center gap-3">

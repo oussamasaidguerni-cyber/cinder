@@ -19,3 +19,53 @@ body,
   font-family: Inter, system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+.cinder-splash-logo {
+  animation: cinder-splash-pop 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.cinder-splash-title {
+  opacity: 0;
+  animation: cinder-splash-fade 700ms ease 400ms both;
+}
+
+.cinder-boot-line {
+  opacity: 0;
+  animation: cinder-splash-fade 350ms ease both;
+}
+
+.cinder-splash-bar div {
+  width: 0%;
+  animation: cinder-splash-fill 2s ease 500ms forwards;
+}
+
+@keyframes cinder-splash-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes cinder-splash-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes cinder-splash-fill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
