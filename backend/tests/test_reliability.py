@@ -25,7 +25,7 @@ def test_nvidia_takes_precedence(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "gemini-test")
     provider = get_provider()
     assert provider.name == "nvidia"
-    assert provider.model_name == "openai/gpt-oss-20b"
+    assert provider.model_name == "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
 
 
 def test_env_model_overrides_default(monkeypatch):

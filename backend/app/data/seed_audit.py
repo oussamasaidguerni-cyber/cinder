@@ -13,7 +13,7 @@ from typing import Callable
 from ..schemas.audit import AuditEntry
 
 _UTC = timezone.utc
-_MODEL = "openai/gpt-oss-20b"
+_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
 _RAW_0001 = (
     "Mar 10 23:14:11 srv-web sshd[31861]: Failed password for invalid user root "
     "from 203.0.113.45 port 59214 ssh2\n"

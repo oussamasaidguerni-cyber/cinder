@@ -50,7 +50,7 @@ CINDER prefers an AI provider in this order: **NVIDIA NIM** (build.nvidia.com)
 
 ```
 NVIDIA_API_KEY=...
-NVIDIA_MODEL=openai/gpt-oss-20b
+NVIDIA_MODEL=nvidia/nemotron-3-nano-omni-30b-a3b-reasoning
 GEMINI_API_KEY=...
 GEMINI_MODEL=gemini-3.5-flash-lite
 ```
@@ -273,7 +273,7 @@ Notes:
 cd backend && python -m pytest -q
 ```
 
-The suite (currently 32 tests) asserts the promises that make it safe to
+The suite (currently 40 tests) asserts the promises that make it safe to
 trust:
 
 - **The Auditor finds the right things and nothing else.** The seeded synthetic
