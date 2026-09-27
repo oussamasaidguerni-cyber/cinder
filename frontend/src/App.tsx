@@ -10,7 +10,7 @@ import { Logo } from './components/Logo'
 import { TriageModal } from './components/TriageModal'
 
 const AI_PROVIDER_LABEL: Record<string, string> = {
-  nvidia: 'NVIDIA Nemotron',
+  nvidia: 'NVIDIA NIM',
   gemini: 'Gemini',
   fallback: 'deterministic engine',
 }

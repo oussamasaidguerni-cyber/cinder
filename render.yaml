@@ -10,7 +10,7 @@ services:
     healthCheckPath: /health
     envVars:
       - key: NVIDIA_MODEL
-        value: nvidia/llama-3.1-nemotron-nano-8b-v1
+        value: openai/gpt-oss-20b
       - key: NVIDIA_API_KEY
         sync: false
       - key: GEMINI_MODEL

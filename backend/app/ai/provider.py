@@ -21,7 +21,7 @@ from .prompts import build_enrichment_prompt, build_incident_prompt, build_quest
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
-DEFAULT_NVIDIA_MODEL = "nvidia/llama-3.1-nemotron-nano-8b-v1"
+DEFAULT_NVIDIA_MODEL = "openai/gpt-oss-20b"
 
 
 class AIError(Exception):
