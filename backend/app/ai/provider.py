@@ -167,6 +167,22 @@ class GeminiProvider(BaseProvider):
         return _validate_enrichment(parsed)
 
 
+def _strip_thinking(text: str) -> str:
+    """Drop an optional leading <thinking> ... </thinking> block if present.
+
+    NVIDIA reasoning models (e.g. Llama Nemotron Nano) sometimes prepend a
+    'thinking' section before the real answer. We keep every character except
+    that explicit block so question answers and incident overviews stay clean.
+    """
+    t = text.strip()
+    start_marker, end_marker = "<thinking>", "</thinking>"
+    if t.startswith(start_marker) and end_marker in t:
+        after = t[t.find(end_marker) + len(end_marker) :].strip()
+        if after:
+            return after
+    return t
+
+
 def _extract_json_object(text: str) -> dict:
     """Leniently pull a JSON object out of a model's text response.
 
@@ -274,7 +290,7 @@ class NVAPIProvider(BaseProvider):
                 with urllib.request.urlopen(req, timeout=30) as resp:
                     body = json.loads(resp.read().decode())
                 choices = body.get("choices") or []
-                content = choices[0]["message"]["content"].strip()
+                content = _strip_thinking(choices[0]["message"]["content"])
                 if not content:
                     raise AIError("NVIDIA returned an empty completion.")
                 return content
