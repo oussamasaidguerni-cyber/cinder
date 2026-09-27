@@ -10,7 +10,7 @@ interface Props {
 }
 
 const MODE_LABEL: Record<AnalysisResult['analysis_mode'], string> = {
-  ai: 'Live AI analysis (Gemini)',
+  ai: 'Live AI analysis',
   deterministic: 'Deterministic engine',
   fallback: 'Fallback — network/API unavailable',
 }
@@ -142,7 +142,7 @@ export function Investigation({ alertId, onBack, onStatusChange }: Props) {
       : ''
     const mode = `${
       result.analysis_mode === 'ai'
-        ? 'Live AI (Gemini)'
+        ? 'Live AI'
         : result.analysis_mode === 'fallback'
           ? 'Fallback / no API'
           : 'Deterministic engine'

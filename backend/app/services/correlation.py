@@ -120,7 +120,7 @@ def correlate_chain(store: AlertStore) -> CorrelatedIncident:
     )
 
     provider = get_provider()
-    if provider.name == "gemini":
+    if provider.is_live():
         try:
             overview = provider.incident_overview(facts)
             analysis_mode, model_used = "ai", provider.model_name

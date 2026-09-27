@@ -2,33 +2,46 @@ import { useEffect } from 'react'
 
 interface Props {
   onClose: () => void
+  providerLabel?: string
 }
 
-const STEPS = [
-  {
-    label: '1 · Ingest',
-    title: 'Signals in',
-    body: 'Alerts from SIEM, EDR, firewall and web logs — or any raw log you paste into the triage box.',
-  },
-  {
-    label: '2 · Deterministic engine',
-    title: 'The verdict is authoritative',
-    body: 'Signature matching sets severity, threat type, confidence, evidence and MITRE ATT&CK mapping. No AI guesswork in the verdict.',
-  },
-  {
-    label: '3 · Gemini enrichment',
-    title: 'AI narrates, never decides',
-    body: 'CINDER sends the verdict to Gemini to write the narrative summary, recommended actions, false-positive indicators and an incident report.',
-  },
-]
+function buildSteps(providerLabel: string) {
+  const aiName =
+    providerLabel && providerLabel !== 'deterministic engine'
+      ? providerLabel
+      : 'the configured LLM (Gemini or NVIDIA Nemotron)'
+  return [
+    {
+      label: '1 · Ingest',
+      title: 'Signals in',
+      body: 'Alerts from SIEM, EDR, firewall and web logs — or any raw log you paste into the triage box.',
+    },
+    {
+      label: '2 · Deterministic engine',
+      title: 'The verdict is authoritative',
+      body: 'Signature matching sets severity, threat type, confidence, evidence and MITRE ATT&CK mapping. No AI guesswork in the verdict.',
+    },
+    {
+      label: '3 · AI enrichment',
+      title: 'AI narrates, never decides',
+      body: `CINDER sends the verdict to ${aiName} to write the narrative summary, recommended actions, false-positive indicators and an incident report.`,
+    },
+  ]
+}
 
-const PRINCIPLES = [
-  ['Analysis modes', 'Every result shows how it was produced: live AI (Gemini), deterministic engine, or honest fallback.'],
-  ['No fake alerts', 'Demo data uses RFC 5737 TEST-NET IPs that can never belong to real infrastructure.'],
-  ['Explainable', 'Evidence lines and MITRE mappings are derived from the log itself, not hallucinated.'],
-]
+function buildPrinciples(providerLabel: string) {
+  const aiName =
+    providerLabel && providerLabel !== 'deterministic engine'
+      ? `${providerLabel}`
+      : 'Gemini or NVIDIA Nemotron'
+  return [
+    ['Analysis modes', `Every result shows how it was produced: live AI (${aiName}), deterministic engine, or honest fallback.`],
+    ['No fake alerts', 'Demo data uses RFC 5737 TEST-NET IPs that can never belong to real infrastructure.'],
+    ['Explainable', 'Evidence lines and MITRE mappings are derived from the log itself, not hallucinated.'],
+  ] as const
+}
 
-export function HowItWorks({ onClose }: Props) {
+export function HowItWorks({ onClose, providerLabel = 'Gemini' }: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -36,6 +49,9 @@ export function HowItWorks({ onClose }: Props) {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
+
+  const steps = buildSteps(providerLabel)
+  const principles = buildPrinciples(providerLabel)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
@@ -54,7 +70,7 @@ export function HowItWorks({ onClose }: Props) {
         </div>
 
         <div className="mb-5 flex flex-col gap-4">
-          {STEPS.map((s, i) => (
+          {steps.map((s, i) => (
             <div key={s.label} className="flex gap-4 rounded-lg border border-cinder-border bg-cinder-bg p-4">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-red-500/15 font-mono text-sm font-bold text-red-400">
                 {i + 1}
@@ -71,7 +87,7 @@ export function HowItWorks({ onClose }: Props) {
         <div className="rounded-lg border border-cinder-border p-4">
           <div className="mb-3 text-[11px] uppercase tracking-wider text-cinder-muted">Design principles</div>
           <div className="flex flex-col gap-3">
-            {PRINCIPLES.map(([k, v]) => (
+            {principles.map(([k, v]) => (
               <div key={k} className="flex gap-3 text-sm">
                 <span className="shrink-0 font-semibold text-cinder-text">{k}</span>
                 <span className="text-cinder-muted">{v}</span>

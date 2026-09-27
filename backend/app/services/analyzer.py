@@ -47,7 +47,7 @@ def analyze_alert(alert: Alert) -> AnalysisResult:
     result = analyze_deterministic(alert)
     provider = get_provider()
 
-    if provider.name == "gemini":
+    if provider.is_live():
         try:
             enrichment = provider.enrich(alert, result)
             result = result.model_copy(
@@ -95,7 +95,7 @@ def ask_question(alert: Alert, question: str) -> tuple[str, str, str]:
     """
     result = analyze_alert_cached(alert)
     provider = get_provider()
-    if provider.name != "gemini":
+    if not provider.is_live():
         return provider.answer(alert, result, question), "fallback", "deterministic"
     try:
         answer = provider.answer(alert, result, question)

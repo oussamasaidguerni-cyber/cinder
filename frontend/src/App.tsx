@@ -9,6 +9,12 @@ import { Investigation } from './components/Investigation'
 import { Logo } from './components/Logo'
 import { TriageModal } from './components/TriageModal'
 
+const AI_PROVIDER_LABEL: Record<string, string> = {
+  nvidia: 'NVIDIA Nemotron',
+  gemini: 'Gemini',
+  fallback: 'deterministic engine',
+}
+
 export default function App() {
   const [openId, setOpenId] = useState<string | null>(
     () => window.location.hash.replace(/^#/, '') || null,
@@ -106,6 +112,10 @@ export default function App() {
     open(alertId)
   }
 
+  const aiProviderLabel = health?.ai_provider
+    ? (AI_PROVIDER_LABEL[health.ai_provider] ?? health.ai_provider)
+    : 'deterministic engine'
+
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-cinder-border bg-cinder-bg/95 backdrop-blur">
@@ -162,7 +172,7 @@ export default function App() {
               onResult={(r) => setLastTriage(r)}
             />
           )}
-          {howOpen && <HowItWorks onClose={() => setHowOpen(false)} />}
+          {howOpen && <HowItWorks onClose={() => setHowOpen(false)} providerLabel={aiProviderLabel} />}
           {corrOpen &&
             (incident ? (
               <CorrelationModal
@@ -269,7 +279,10 @@ export default function App() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 text-[11px] text-cinder-muted">
           <span>Built for GOMYCODE × NVIDIA Hackathon 2026 · FastAPI + React · so-called security</span>
           <span className="inline-flex items-center gap-1.5">
-            Deterministic engine + Gemini · demo data uses RFC 5737 TEST-NET IPs
+            {health?.ai_configured
+              ? `Deterministic engine + ${aiProviderLabel}`
+              : 'Deterministic engine only'}
+            · demo data uses RFC 5737 TEST-NET IPs
           </span>
         </div>
       </footer>

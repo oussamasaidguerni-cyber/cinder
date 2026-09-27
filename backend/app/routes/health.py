@@ -1,7 +1,6 @@
-import os
-
 from fastapi import APIRouter
 
+from ..ai.provider import get_provider
 from ..schemas import HealthResponse
 
 router = APIRouter(tags=["health"])
@@ -18,10 +17,10 @@ def read_version() -> str:
 
 @router.get("/health", response_model=HealthResponse)
 def health() -> HealthResponse:
-    key = os.environ.get("GEMINI_API_KEY", "").strip()
+    provider = get_provider()
     return HealthResponse(
         status="ok",
         version=read_version(),
-        ai_provider="gemini" if key else "fallback",
-        ai_configured=bool(key),
+        ai_provider=provider.name,
+        ai_configured=provider.is_live(),
     )
