@@ -27,7 +27,7 @@ from .prompts import (
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
-DEFAULT_NVIDIA_MODEL = "openai/gpt-oss-20b"
+DEFAULT_NVIDIA_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning"
 
 
 class AIError(Exception):
