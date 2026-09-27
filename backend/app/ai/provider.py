@@ -17,7 +17,12 @@ import urllib.request
 from dataclasses import dataclass
 
 from ..schemas.analysis import AnalysisResult
-from .prompts import build_enrichment_prompt, build_incident_prompt, build_question_prompt
+from .prompts import (
+    build_audit_prompt,
+    build_enrichment_prompt,
+    build_incident_prompt,
+    build_question_prompt,
+)
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 NVIDIA_API_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
@@ -58,6 +63,9 @@ class BaseProvider:
         raise NotImplementedError
 
     def incident_overview(self, facts: str) -> str:
+        raise NotImplementedError
+
+    def audit_insight(self, facts: str) -> str:
         raise NotImplementedError
 
 
@@ -128,6 +136,23 @@ class GeminiProvider(BaseProvider):
             raise AIError("Gemini returned an unexpected or non-JSON payload.") from exc
         if not text:
             raise AIError("Gemini returned an empty incident overview.")
+        return text
+
+    def audit_insight(self, facts: str) -> str:
+        payload = {
+            "contents": [{"parts": [{"text": build_audit_prompt(facts)}]}],
+            "generationConfig": {
+                "temperature": 0.3,
+                "maxOutputTokens": 512,
+            },
+        }
+        body = self._call_gemini(payload)
+        try:
+            text = body["candidates"][0]["content"]["parts"][0]["text"].strip()
+        except (KeyError, IndexError) as exc:
+            raise AIError("Gemini returned an unexpected or non-JSON payload.") from exc
+        if not text:
+            raise AIError("Gemini returned an empty audit insight.")
         return text
 
     def _call_gemini(self, payload: dict) -> dict:
@@ -267,6 +292,14 @@ class NVAPIProvider(BaseProvider):
             raise AIError("NVIDIA returned an empty incident overview.")
         return text
 
+    def audit_insight(self, facts: str) -> str:
+        text = self._chat(
+            build_audit_prompt(facts), temperature=0.3, max_tokens=512
+        ).strip()
+        if not text:
+            raise AIError("NVIDIA returned an empty audit insight.")
+        return text
+
     def _chat(self, prompt: str, temperature: float, max_tokens: int) -> str:
         """POST to NVIDIA NIM, retrying transient 429/5xx with backoff."""
         payload = {
@@ -348,6 +381,16 @@ class MockProvider(BaseProvider):
             "alerts share a plausible stage sequence and should be treated as "
             "one investigation priority. Add a GEMINI_API_KEY or NVIDIA_API_KEY "
             "for a live AI-narrated incident overview."
+        )
+
+    def audit_insight(self, facts: str) -> str:
+        return (
+            "Fallback (demo) mode — live AI is not configured for the insight. "
+            "Grounding in the auditor's evidence, the highest-ranked problem "
+            "repeats across the most sessions, so a developer should reproduce "
+            "that transcript first: re-run the affected operations with the "
+            "exact arguments in the evidence and confirm whether the same "
+            "artifact is produced."
         )
 
 

@@ -90,3 +90,22 @@ exploiting systems. If you don't know, say so and suggest what evidence would
 clarify it. Use 'likely', 'potentially', or 'evidence suggests' where
 appropriate.
 """
+
+
+def build_audit_prompt(facts: str) -> str:
+    return f"""You are an observability engineer reviewing an AI agent's run
+transcript. A deterministic auditor has grouped recurring failures in the agent
+conversation log. Your ONLY job is to phrase WHY the top problem matters and
+what a developer should reproduce first. Do not invent facts; stay grounded in
+the evidence below.
+
+AUDITED FACTS:
+{facts}
+
+Return a plain-text take of 3-6 sentences:
+- State why this failure pattern hurts users even though the agent reported no
+  technical error.
+- Recommend ONE specific thing a developer should reproduce/investigate first,
+  matching the evidence exactly (session ids, alert ids, quoted artifacts).
+- Keep it honest: note uncertainty if the pattern could be a legitimate retry.
+"""

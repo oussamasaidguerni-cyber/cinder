@@ -4,7 +4,9 @@ import sqlite3
 from pathlib import Path
 
 from ..schemas.alerts import Alert, AlertStatus, AlertSummary, AlertType, Severity
+from ..schemas.audit import AuditEntry
 from .seed_alerts import seed_alerts
+from .seed_audit import seed_audit
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS alerts (
@@ -18,6 +20,27 @@ CREATE TABLE IF NOT EXISTS alerts (
     status      TEXT NOT NULL,
     raw_log     TEXT NOT NULL,
     description TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id            TEXT PRIMARY KEY,
+    session_id    TEXT NOT NULL,
+    op            TEXT NOT NULL,
+    alert_id      TEXT,
+    question      TEXT,
+    analysis_mode TEXT NOT NULL,
+    model_used    TEXT,
+    latency_ms    INTEGER NOT NULL DEFAULT 0,
+    severity      TEXT,
+    confidence    INTEGER,
+    threat_type   TEXT,
+    summary       TEXT,
+    answer        TEXT,
+    overview      TEXT,
+    actions_count INTEGER,
+    report_len    INTEGER,
+    raw_log       TEXT,
+    created_at    TEXT NOT NULL
 );
 """
 
@@ -182,6 +205,107 @@ class AlertStore:
             status=AlertStatus(row["status"]),
             raw_log=row["raw_log"],
             description=row["description"],
+        )
+
+    def audit_count(self) -> int:
+        row = self._conn.execute("SELECT COUNT(*) AS n FROM audit_log").fetchone()
+        return int(row["n"]) if row else 0
+
+    def ensure_audit_seeded(self) -> None:
+        if self.audit_count() == 0:
+            self.replace_audit(seed_audit())
+
+    def replace_audit(self, entries: list[AuditEntry]) -> None:
+        self._conn.execute("DELETE FROM audit_log")
+        for e in entries:
+            self._conn.execute(
+                "INSERT OR REPLACE INTO audit_log "
+                "(id, session_id, op, alert_id, question, analysis_mode, model_used, "
+                " latency_ms, severity, confidence, threat_type, summary, answer, "
+                " overview, actions_count, report_len, raw_log, created_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    e.id,
+                    e.session_id,
+                    e.op,
+                    e.alert_id,
+                    e.question,
+                    e.analysis_mode,
+                    e.model_used,
+                    e.latency_ms,
+                    e.severity,
+                    e.confidence,
+                    e.threat_type,
+                    e.summary,
+                    e.answer,
+                    e.overview,
+                    e.actions_count,
+                    e.report_len,
+                    e.raw_log,
+                    e.created_at.isoformat(),
+                ),
+            )
+        self._conn.commit()
+
+    def insert_audit(self, entry: AuditEntry) -> None:
+        self._conn.execute(
+            "INSERT INTO audit_log "
+            "(id, session_id, op, alert_id, question, analysis_mode, model_used, "
+            " latency_ms, severity, confidence, threat_type, summary, answer, "
+            " overview, actions_count, report_len, raw_log, created_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                entry.id,
+                entry.session_id,
+                entry.op,
+                entry.alert_id,
+                entry.question,
+                entry.analysis_mode,
+                entry.model_used,
+                entry.latency_ms,
+                entry.severity,
+                entry.confidence,
+                entry.threat_type,
+                entry.summary,
+                entry.answer,
+                entry.overview,
+                entry.actions_count,
+                entry.report_len,
+                entry.raw_log,
+                entry.created_at.isoformat(),
+            ),
+        )
+        self._conn.commit()
+
+    def list_audit(self) -> list[AuditEntry]:
+        rows = self._conn.execute(
+            "SELECT * FROM audit_log ORDER BY created_at ASC"
+        ).fetchall()
+        return [self._row_to_audit(r) for r in rows]
+
+    @staticmethod
+    def _row_to_audit(row: sqlite3.Row) -> AuditEntry:
+        from datetime import datetime
+
+        return AuditEntry(
+            id=row["id"],
+            session_id=row["session_id"],
+            op=row["op"],
+            alert_id=row["alert_id"],
+            question=row["question"],
+            analysis_mode=row["analysis_mode"],
+            model_used=row["model_used"],
+            latency_ms=row["latency_ms"] or 0,
+            severity=row["severity"],
+            confidence=row["confidence"],
+            threat_type=row["threat_type"],
+            summary=row["summary"],
+            answer=row["answer"],
+            overview=row["overview"],
+            actions_count=row["actions_count"],
+            report_len=row["report_len"],
+            raw_log=row["raw_log"],
+            created_at=datetime.fromisoformat(row["created_at"]),
         )
 
     def close(self) -> None:

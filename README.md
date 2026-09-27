@@ -97,6 +97,26 @@ GEMINI_MODEL=gemini-3.5-flash-lite
    - false-positive indicators
    - a copyable incident report and a full Markdown case export
 
+5. **Correlation** groups related alerts into a kill-chain *hypothesis*; the AI
+   may only phrase the overview, never the facts.
+6. **The Auditor** (Header → Auditor) is the SupplyzPro "Find the Hidden
+   Failures" entry: every agent operation is recorded as a run, and the
+   Auditor scans the trail for five hidden-failure signatures and returns a
+   ranked, grouped, evidence-backed issue list:
+   - `unsupported_success_claim` — narrative claims a success the engine can't
+     support (e.g. "confirmed"/"contained" on a LOW-confidence verdict)
+   - `repeated_questions` — the analyst asks the same question and the answer
+     does not land
+   - `no_progress_search` — different probes return the same dead-end answer
+   - `wrong_record` — the answer cites a host/IP never grounded in the raw log
+   - `incomplete_finished` — finished output with no actions/report
+
+   Legitimate retries and honest recovery (AI fails → deterministic fallback →
+   retry succeeds) are shown separately from real failures; ambiguous cases are
+   kept for human review. Deterministic detection is free and instant; an
+   optional `?ai=1` pass adds a narrated "fix this first" take from the
+   configured provider. Outcome includes limits, runtime and processing cost.
+
 ## Demo alerts
 
 | ID | Type | Severity | MITRE |
@@ -112,16 +132,23 @@ GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 backend/app/
   main.py          FastAPI app, startup seeding, CORS
-  routes/          health, alerts (list/detail/analyze/stats/simulate)
-  services/        engine (deterministic), mitre map, analyzer, simulator
-  ai/              provider.py (Gemini + fallback), prompts.py
-  schemas/         pydantic models (Alert, AnalysisResult, Stats...)
-  data/            SQLite store + demo seed
+  routes/          health, alerts (list/detail/analyze/stats/simulate), audit
+  services/        engine (deterministic), mitre map, analyzer, simulator, audit
+  ai/              provider.py (NVIDIA NIM + Gemini + fallback), prompts.py
+  schemas/         pydantic models (Alert, AnalysisResult, Audit*, Stats...)
+  data/            SQLite store + demo seed (alerts + agent-run audit trail)
 frontend/src/
   api.ts           typed API client
-  components/      Logo, AlertTable, Investigation, TriageModal,
+  components/      Logo, AlertTable, Investigation, TriageModal, AuditorModal,
                    HowItWorks, Cards, Badges
   App.tsx          layout, KPI + navigation (hash-based routes)
+
+## Auditor API
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/audit` | ranked findings + grouped sessions + honesty panel (`?ai=1` adds narrated insights) |
+| GET | `/audit/entries` | raw agent-run transcript (conversation + tool calls) |
 ```
 
 ## API
@@ -138,6 +165,8 @@ frontend/src/
 | PATCH | `/alerts/{id}/status` | update workflow status |
 | POST | `/alerts/{id}/ask` | free-text questions about an alert |
 | POST | `/alerts/simulate` | inject a fresh fabricated alert (demo) |
+| GET | `/audit` | Auditor: ranked hidden failures, groups, evidence, cost |
+| GET | `/audit/entries` | raw agent-run transcript |
 
 Interactive docs: http://127.0.0.1:8000/docs
 

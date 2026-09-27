@@ -91,3 +91,74 @@ export interface CorrelatedIncident {
   analysis_mode: 'deterministic' | 'ai' | 'fallback'
   model_used: string | null
 }
+
+export interface AuditEntry {
+  id: string
+  session_id: string
+  op: string
+  alert_id: string | null
+  question: string | null
+  analysis_mode: string
+  model_used: string | null
+  latency_ms: number
+  severity: Severity | null
+  confidence: number | null
+  threat_type: string | null
+  summary: string | null
+  answer: string | null
+  overview: string | null
+  actions_count: number | null
+  report_len: number | null
+  raw_log: string | null
+  created_at: string
+}
+
+export interface AuditFinding {
+  id: string
+  signature: string
+  label: string
+  severity: Severity
+  confidence: number
+  session_id: string
+  entry_ids: string[]
+  evidence: string[]
+  explanation: string
+}
+
+export interface AuditRecovery {
+  session_id: string
+  label: string
+  entry_ids: string[]
+  evidence: string[]
+}
+
+export interface AuditGroup {
+  signature: string
+  label: string
+  severity: Severity
+  count: number
+  sessions: string[]
+  score: number
+}
+
+export interface AuditInsight {
+  signature: string
+  label: string
+  insight: string
+}
+
+export interface AuditTrailResponse {
+  generated_at: string
+  method: string
+  ai_provider: string
+  ai_status: string
+  entry_count: number
+  findings: AuditFinding[]
+  groups: AuditGroup[]
+  recoveries: AuditRecovery[]
+  ambiguous: AuditFinding[]
+  ai_insights: AuditInsight[]
+  limitations: string[]
+  runtime_ms: number
+  cost_note: string
+}

@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from .data.seed_alerts import seed_alerts
 from .data.store import AlertStore
 from .routes.alerts import router as alerts_router
+from .routes.audit import router as audit_router
 from .routes.health import router as health_router
 
 app = FastAPI(
@@ -27,6 +28,7 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(alerts_router)
+app.include_router(audit_router)
 
 # Serve the built React frontend so the whole app is ONE service (cloud deploy).
 # In local dev the frontend is served by Vite at :5173 instead; both keep working.
@@ -51,5 +53,7 @@ def startup_seed() -> None:
     try:
         if store.count() == 0:
             store.replace_all(seed_alerts())
+        # Seed the agent-run trail so the Auditor demo has transcript on first load.
+        store.ensure_audit_seeded()
     finally:
         store.close()

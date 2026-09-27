@@ -4,6 +4,8 @@ import type {
   AlertSummary,
   AnalysisResult,
   AskResponse,
+  AuditEntry,
+  AuditTrailResponse,
   BatchAnalysisItem,
   CorrelatedIncident,
   Health,
@@ -57,4 +59,6 @@ export const api = {
   ask: (id: string, question: string) =>
     post<AskResponse>(`/alerts/${id}/ask`, { question }),
   correlate: () => post<CorrelatedIncident>('/alerts/correlate'),
+  audit: (ai = false) => get<AuditTrailResponse>(`/audit${ai ? '?ai=1' : ''}`),
+  auditEntries: () => get<AuditEntry[]>('/audit/entries'),
 }

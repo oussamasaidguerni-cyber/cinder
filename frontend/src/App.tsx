@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from './api'
 import type { AnalysisResult, CorrelatedIncident, Health, Stats } from './types'
 import { AlertTable } from './components/AlertTable'
+import { AuditorModal } from './components/AuditorModal'
 import { KpiCards, SeverityDistribution, StatusDistribution } from './components/Cards'
 import { CorrelationModal } from './components/CorrelationModal'
 import { HowItWorks } from './components/HowItWorks'
@@ -31,6 +32,7 @@ export default function App() {
   const [correlating, setCorrelating] = useState(false)
   const [incident, setIncident] = useState<CorrelatedIncident | null>(null)
   const [corrError, setCorrError] = useState<string | null>(null)
+  const [auditorOpen, setAuditorOpen] = useState(false)
 
   const open = (id: string) => {
     window.location.hash = id
@@ -149,6 +151,12 @@ export default function App() {
             >
               Triage log
             </button>
+            <button
+              onClick={() => setAuditorOpen(true)}
+              className="rounded border border-cinder-border px-3 py-1.5 text-xs font-medium text-cinder-text hover:border-sky-400/50 hover:text-sky-400"
+            >
+              Auditor
+            </button>
             <span className="hidden md:inline">v{health?.version ?? '0.1.0'}</span>
             <span className="inline-flex items-center gap-1.5">
               <span
@@ -164,8 +172,9 @@ export default function App() {
         </div>
       </header>
 
-      {(triageOpen || howOpen || corrOpen) && (
+      {(triageOpen || howOpen || corrOpen || auditorOpen) && (
         <>
+          {auditorOpen && <AuditorModal onClose={() => setAuditorOpen(false)} />}
           {triageOpen && (
             <TriageModal
               onClose={() => setTriageOpen(false)}
