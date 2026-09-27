@@ -41,3 +41,55 @@ export function TypeChip({ type }: { type: string }) {
     </span>
   )
 }
+
+export function DataKindBadge({ kind }: { kind: string }) {
+  if (kind === 'live') {
+    return (
+      <span className="inline-flex items-center rounded border border-emerald-500/30 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-400">
+        ● LIVE
+      </span>
+    )
+  }
+  if (kind === 'cached') {
+    return (
+      <span className="inline-flex items-center rounded border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[11px] font-semibold text-sky-400">
+        ◐ CACHED
+      </span>
+    )
+  }
+  if (kind === 'synthetic')
+    return (
+      <span className="inline-flex items-center rounded border border-yellow-500/30 bg-yellow-500/15 px-2 py-0.5 text-[11px] font-semibold text-yellow-400">
+        ⚠ SYNTHETIC
+      </span>
+    )
+  return (
+    <span className="inline-flex items-center rounded border border-cinder-border bg-cinder-panel px-2 py-0.5 text-[11px] text-cinder-muted">
+      {kind}
+    </span>
+  )
+}
+
+export function KevStatusPill({ status }: { status: string }) {
+  if (status === 'IN_KEV') {
+    return (
+      <span
+        className="inline-flex items-center rounded border border-red-500/40 bg-red-500/15 px-2 py-0.5 text-[11px] font-bold text-red-400"
+        title="Known Exploited Vulnerabilities catalog"
+      >
+        EXPLOITED IN THE WILD (CISA)
+      </span>
+    )
+  }
+  if (status === 'UNKNOWN')
+    return (
+      <span className="inline-flex items-center rounded border border-cinder-border bg-cinder-panel px-2 py-0.5 text-[11px] text-cinder-muted">
+        KEV status unknown
+      </span>
+    )
+  return (
+    <span className="inline-flex items-center rounded border border-cinder-border bg-cinder-panel px-2 py-0.5 text-[11px] text-cinder-muted">
+      Not in KEV catalog
+    </span>
+  )
+}

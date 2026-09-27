@@ -9,6 +9,10 @@ import type {
   BatchAnalysisItem,
   CorrelatedIncident,
   Health,
+  IntelFinding,
+  IntelSearchResult,
+  IntelSourcesResponse,
+  IntelStatsResponse,
   Severity,
   Stats,
 } from './types'
@@ -61,4 +65,10 @@ export const api = {
   correlate: () => post<CorrelatedIncident>('/alerts/correlate'),
   audit: (ai = false) => get<AuditTrailResponse>(`/audit${ai ? '?ai=1' : ''}`),
   auditEntries: () => get<AuditEntry[]>('/audit/entries'),
+  intelSearch: (q: string) =>
+    get<IntelSearchResult[]>(`/intel/search?q=${encodeURIComponent(q)}`),
+  intelAnalyze: (cveId: string, force = false) =>
+    get<IntelFinding>(`/intel/cves/${cveId}${force ? '?force=true' : ''}`),
+  intelSources: () => get<IntelSourcesResponse>('/intel/sources'),
+  intelStats: () => get<IntelStatsResponse>('/intel/stats'),
 }

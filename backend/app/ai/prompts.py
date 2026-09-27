@@ -109,3 +109,44 @@ Return a plain-text take of 3-6 sentences:
   matching the evidence exactly (session ids, alert ids, quoted artifacts).
 - Keep it honest: note uncertainty if the pattern could be a legitimate retry.
 """
+
+
+def build_cve_report_prompt(facts_json: str, verdict_json: str) -> str:
+    return f"""You are CINDER, a defensive vulnerability-intelligence analyst.
+
+A DETERMINISTIC ENGINE produced the analysis below from VERIFIED public source
+data (NIST NVD, CISA KEV, MITRE ATT&CK). Those sources are authoritative. Your
+ONLY job is to phrase a cautious analyst write-up. You MUST NOT invent facts,
+scores, CVEs, vendors, or fixes that are not present below. Whenever a field is
+missing, say "Insufficient evidence." explicitly in that answer area.
+
+VERIFIED FACTS (do not contradict, do not extend):
+{facts_json}
+
+ENGINE VERDICT (authoritative — do not change):
+{verdict_json}
+
+Return STRICT JSON with EXACTLY these keys (nothing else):
+{{
+  "explanation": "3-6 sentences, cautious, 'likely'/'potentially' wording.
+                  Explain what the vulnerability is and its impact using ONLY
+                  the facts above.",
+  "why_it_matters": "2-4 sentences on why an analyst should care, grounded
+                     strictly in the facts (CVSS, KEV membership, techniques).
+                     If there is no reason, write 'Insufficient evidence.'",
+  "investigation": ["defensive next steps a Tier-1 analyst takes in THEIR OWN
+                     environment — never attacking third parties"],
+  "remediation": ["defensive remediation steps grounded in available info
+                   (e.g. apply vendor advisory if a reference exists)"],
+  "uncertainty": "One sentence listing missing facts, or 'Insufficient evidence.'
+                  when data is sparse."
+}}
+
+Rules:
+- Do NOT claim this CVE was exploited unless the CISA KEV record says so.
+- Do NOT invent CVE numbers, CVSS scores, vendors, or patch versions.
+- Distinguish vulnerability intelligence from a confirmed intrusion: this is a
+  VULNERABILITY record, not evidence of an incident in this environment.
+- Recommended actions must be defensive and non-destructive (patching,
+  inventory checks, exposure review, or escalation to the asset owner).
+"""

@@ -162,3 +162,140 @@ export interface AuditTrailResponse {
   runtime_ms: number
   cost_note: string
 }
+
+// --- Intel (real vulnerability intelligence) -------------------------------
+
+export interface AttckTechnique {
+  technique_id: string
+  technique_name: string
+  tactic: string
+  description: string
+  technique_url: string
+  basis: string
+}
+
+export interface CvssMetric {
+  version: string
+  vector_string: string
+  base_score: number
+  base_severity: string
+  attack_vector?: string | null
+  attack_complexity?: string | null
+  privileges_required?: string | null
+  user_interaction?: string | null
+  scope?: string | null
+  exploitability_score?: number | null
+  impact_score?: number | null
+}
+
+export interface AffectedProduct {
+  cpe: string
+  vendor?: string | null
+  product?: string | null
+}
+
+export interface KevEntry {
+  in_catalog: boolean
+  catalog_status: string
+  catalog_date?: string | null
+  cve_id?: string | null
+  vendor_project?: string | null
+  product?: string | null
+  vulnerability_name?: string | null
+  date_added?: string | null
+  short_description?: string | null
+  required_action?: string | null
+  due_date?: string | null
+  known_ransomware_use?: boolean
+}
+
+export interface IntelReference {
+  url: string
+  tags: string[]
+}
+
+export interface IntelVerdict {
+  priority: string
+  priority_score: number
+  known_exploited: boolean
+  reasons: string[]
+  formula: string
+  thresholds: Record<string, number>
+}
+
+export interface IntelReport {
+  mode: string
+  model_used?: string | null
+  explanation: string
+  why_it_matters: string
+  investigation: string[]
+  remediation: string[]
+  uncertainty: string
+}
+
+export interface IntelMetrics {
+  data_kind: string
+  cached_note?: string | null
+  sources_consulted: string[]
+  enrichment_ms: number
+  ai_ms: number
+  total_ms: number
+}
+
+export interface IntelFinding {
+  cve_id: string
+  data_kind: string
+  retrieved_at: string
+  source: string
+  published?: string | null
+  last_modified?: string | null
+  vuln_status?: string | null
+  description: string
+  cvss?: CvssMetric | null
+  cwes: string[]
+  affected_products: AffectedProduct[]
+  references: IntelReference[]
+  kev: KevEntry
+  attck: AttckTechnique[]
+  verdict: IntelVerdict | null
+  report: IntelReport | null
+  metrics: IntelMetrics
+  sources: string[]
+}
+
+export interface IntelSearchResult {
+  cve_id: string
+  published?: string | null
+  base_score?: number | null
+  base_severity?: string | null
+  description: string
+  cwes: string[]
+  kev_status: string
+  priority?: string | null
+  data_kind: string
+}
+
+export interface IntelSourceInfo {
+  name: string
+  kind: string
+  url: string
+  note: string
+  catalog_date?: string | null
+}
+
+export interface IntelSourcesResponse {
+  sources: IntelSourceInfo[]
+  cache: {
+    cve_count: number
+    kev_catalog_date?: string | null
+    kev_last_fetched?: string | null
+  }
+}
+
+export interface IntelStatsResponse {
+  processed: number
+  priority_distribution: Record<string, number>
+  known_exploited: number
+  newest_retrieved?: string | null
+  kev_catalog_date?: string | null
+}

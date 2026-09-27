@@ -6,6 +6,7 @@ import { AuditorModal } from './components/AuditorModal'
 import { KpiCards, SeverityDistribution, StatusDistribution } from './components/Cards'
 import { CorrelationModal } from './components/CorrelationModal'
 import { HowItWorks } from './components/HowItWorks'
+import { IntelModal } from './components/IntelModal'
 import { Investigation } from './components/Investigation'
 import { Logo } from './components/Logo'
 import { TriageModal } from './components/TriageModal'
@@ -33,6 +34,7 @@ export default function App() {
   const [incident, setIncident] = useState<CorrelatedIncident | null>(null)
   const [corrError, setCorrError] = useState<string | null>(null)
   const [auditorOpen, setAuditorOpen] = useState(false)
+  const [intelOpen, setIntelOpen] = useState(false)
 
   const open = (id: string) => {
     window.location.hash = id
@@ -157,6 +159,12 @@ export default function App() {
             >
               Auditor
             </button>
+            <button
+              onClick={() => setIntelOpen(true)}
+              className="rounded border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-400 hover:border-emerald-400/70 hover:bg-emerald-500/20"
+            >
+              Threat intel
+            </button>
             <span className="hidden md:inline">v{health?.version ?? '0.1.0'}</span>
             <span className="inline-flex items-center gap-1.5">
               <span
@@ -172,8 +180,9 @@ export default function App() {
         </div>
       </header>
 
-      {(triageOpen || howOpen || corrOpen || auditorOpen) && (
+      {(triageOpen || howOpen || corrOpen || auditorOpen || intelOpen) && (
         <>
+          {intelOpen && <IntelModal onClose={() => setIntelOpen(false)} />}
           {auditorOpen && <AuditorModal onClose={() => setAuditorOpen(false)} />}
           {triageOpen && (
             <TriageModal
@@ -291,7 +300,7 @@ export default function App() {
             {health?.ai_configured
               ? `Deterministic engine + ${aiProviderLabel}`
               : 'Deterministic engine only'}
-            · demo data uses RFC 5737 TEST-NET IPs
+            · threat intel from NVD/KEV/ATT&CK · demo alerts labeled SYNTHETIC
           </span>
         </div>
       </footer>

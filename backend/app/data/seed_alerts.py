@@ -114,4 +114,8 @@ raw_log=(
 
 
 def seed_alerts() -> list[Alert]:
-    return _seed()
+    seeded = _seed()
+    for a in seeded:
+        if "[SYNTHETIC]" not in a.description:
+            a.description = f"{a.description} [SYNTHETIC seed]"
+    return seeded

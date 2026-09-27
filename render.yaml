@@ -17,3 +17,5 @@ services:
         value: gemini-3.5-flash-lite
       - key: GEMINI_API_KEY
         sync: false
+      - key: NVD_API_KEY
+        sync: false

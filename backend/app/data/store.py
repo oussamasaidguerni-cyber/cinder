@@ -1,6 +1,8 @@
 """SQLite-backed alert store using only the Python standard library."""
 
+import json
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 from ..schemas.alerts import Alert, AlertStatus, AlertSummary, AlertType, Severity
@@ -41,6 +43,28 @@ CREATE TABLE IF NOT EXISTS audit_log (
     report_len    INTEGER,
     raw_log       TEXT,
     created_at    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS intel_cve_cache (
+    cve_id        TEXT PRIMARY KEY,
+    raw_record    TEXT NOT NULL,
+    retrieved_at  TEXT NOT NULL,
+    last_checked  TEXT NOT NULL,
+    verdict       TEXT,
+    attck         TEXT,
+    kev_entry     TEXT,
+    kev_catalog_date TEXT,
+    report        TEXT
+);
+
+CREATE TABLE IF NOT EXISTS intel_kev_catalog (
+    cve_id        TEXT PRIMARY KEY,
+    entry_json    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS intel_kev_meta (
+    key           TEXT PRIMARY KEY,
+    value         TEXT NOT NULL
 );
 """
 
@@ -310,3 +334,123 @@ class AlertStore:
 
     def close(self) -> None:
         self._conn.close()
+
+    # --- Intel (CVE intelligence) cache -------------------------------------
+
+    def intel_get_cve(self, cve_id: str) -> dict | None:
+        row = self._conn.execute(
+            "SELECT * FROM intel_cve_cache WHERE cve_id = ?", (cve_id,)
+        ).fetchone()
+        if not row:
+            return None
+        return {
+            "cve_id": row["cve_id"],
+            "raw_record": row["raw_record"],
+            "retrieved_at": row["retrieved_at"],
+            "last_checked": row["last_checked"],
+            "verdict": row["verdict"],
+            "attck": row["attck"],
+            "kev_entry": row["kev_entry"],
+            "kev_catalog_date": row["kev_catalog_date"],
+            "report": row["report"],
+        }
+
+    def intel_put_cve(
+        self,
+        cve_id: str,
+        raw_record: str,
+        retrieved_at: str,
+        last_checked: str,
+        verdict: str | None = None,
+        attck: str | None = None,
+        kev_entry: str | None = None,
+        kev_catalog_date: str | None = None,
+        report: str | None = None,
+    ) -> None:
+        self._conn.execute(
+            "INSERT OR REPLACE INTO intel_cve_cache "
+            "(cve_id, raw_record, retrieved_at, last_checked, verdict, attck, "
+            " kev_entry, kev_catalog_date, report) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (
+                cve_id,
+                raw_record,
+                retrieved_at,
+                last_checked,
+                verdict,
+                attck,
+                kev_entry,
+                kev_catalog_date,
+                report,
+            ),
+        )
+        self._conn.commit()
+
+    def intel_introspect_fresh(self, cve_id: str, max_age_days: float) -> bool:
+        """True when a cached CVE record is fresh enough to skip a live fetch."""
+        row = self._conn.execute(
+            "SELECT last_checked FROM intel_cve_cache WHERE cve_id = ?", (cve_id,)
+        ).fetchone()
+        if not row:
+            return False
+        from datetime import datetime, timezone
+
+        try:
+            checked = datetime.fromisoformat(row["last_checked"])
+        except ValueError:
+            return False
+        return (datetime.now(timezone.utc) - checked).total_seconds() < (
+            max_age_days * 86400
+        )
+
+    def intel_cve_count(self) -> int:
+        row = self._conn.execute("SELECT COUNT(*) AS n FROM intel_cve_cache").fetchone()
+        return int(row["n"]) if row else 0
+
+    def intel_cves(self) -> list[dict]:
+        rows = self._conn.execute(
+            "SELECT * FROM intel_cve_cache ORDER BY retrieved_at DESC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def intel_kev_get_released(self) -> str | None:
+        row = self._conn.execute(
+            "SELECT value FROM intel_kev_meta WHERE key = 'dateReleased'"
+        ).fetchone()
+        return row["value"] if row else None
+
+    def intel_kev_replace(self, entries: dict[str, dict], date_released: str | None) -> None:
+        self._conn.execute("DELETE FROM intel_kev_catalog")
+        for cve_id, entry in entries.items():
+            self._conn.execute(
+                "INSERT OR REPLACE INTO intel_kev_catalog (cve_id, entry_json) "
+                "VALUES (?,?)",
+                (cve_id, json.dumps(entry)),
+            )
+        self._conn.execute(
+            "INSERT OR REPLACE INTO intel_kev_meta (key, value) VALUES ('dateReleased', ?)",
+            (date_released or "",),
+        )
+        self._conn.execute(
+            "INSERT OR REPLACE INTO intel_kev_meta (key, value) VALUES "
+            "('lastFetched', ?)",
+            (datetime.now(timezone.utc).isoformat(),),
+        )
+        self._conn.commit()
+
+    def intel_kev_get_entry(self, cve_id: str) -> dict | None:
+        row = self._conn.execute(
+            "SELECT entry_json FROM intel_kev_catalog WHERE cve_id = ?", (cve_id,)
+        ).fetchone()
+        if not row:
+            return None
+        try:
+            return json.loads(row["entry_json"])
+        except (json.JSONDecodeError, TypeError):
+            return None
+
+    def intel_kev_last_fetched(self) -> str | None:
+        row = self._conn.execute(
+            "SELECT value FROM intel_kev_meta WHERE key = 'lastFetched'"
+        ).fetchone()
+        return row["value"] if row else None

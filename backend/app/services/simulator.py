@@ -104,6 +104,6 @@ def simulate_alert(store: AlertStore) -> Alert:
             severity=severity,
             status=AlertStatus.NEW,
             raw_log=sample["raw_log"],
-            description=sample["description"],
+            description=f"{sample['description']} [SYNTHETIC]",
         )
     )

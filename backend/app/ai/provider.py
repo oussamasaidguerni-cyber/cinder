@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from ..schemas.analysis import AnalysisResult
 from .prompts import (
     build_audit_prompt,
+    build_cve_report_prompt,
     build_enrichment_prompt,
     build_incident_prompt,
     build_question_prompt,
@@ -39,6 +40,15 @@ class NarrativeEnrichment:
     recommended_actions: list[str]
     false_positive_indicators: list[str]
     incident_report: str
+
+
+@dataclass
+class CveReport:
+    explanation: str
+    why_it_matters: str
+    investigation: list[str]
+    remediation: list[str]
+    uncertainty: str
 
 
 class BaseProvider:
@@ -66,6 +76,9 @@ class BaseProvider:
         raise NotImplementedError
 
     def audit_insight(self, facts: str) -> str:
+        raise NotImplementedError
+
+    def cve_report(self, facts: str, verdict: str) -> CveReport:
         raise NotImplementedError
 
 
@@ -154,6 +167,23 @@ class GeminiProvider(BaseProvider):
         if not text:
             raise AIError("Gemini returned an empty audit insight.")
         return text
+
+    def cve_report(self, facts: str, verdict: str) -> CveReport:
+        payload = {
+            "contents": [{"parts": [{"text": build_cve_report_prompt(facts, verdict)}]}],
+            "generationConfig": {
+                "temperature": 0.2,
+                "maxOutputTokens": 1024,
+                "responseMimeType": "application/json",
+            },
+        }
+        body = self._call_gemini(payload)
+        try:
+            text = body["candidates"][0]["content"]["parts"][0]["text"]
+            parsed = json.loads(text)
+        except (KeyError, IndexError, json.JSONDecodeError) as exc:
+            raise AIError("Gemini returned an unexpected or non-JSON payload.") from exc
+        return _validate_cve_report(parsed)
 
     def _call_gemini(self, payload: dict) -> dict:
         """POST to Gemini, retrying transient 429/5xx responses with backoff.
@@ -245,6 +275,23 @@ def _validate_enrichment(parsed: dict) -> NarrativeEnrichment:
     )
 
 
+def _validate_cve_report(parsed: dict) -> CveReport:
+    explanation = str(parsed.get("explanation", "")).strip()
+    if not explanation:
+        raise AIError("AI returned an empty CVE explanation.")
+    investigation = parsed.get("investigation", [])
+    remediation = parsed.get("remediation", [])
+    if not isinstance(investigation, list) or not isinstance(remediation, list):
+        raise AIError("AI returned non-list CVE report fields.")
+    return CveReport(
+        explanation=explanation,
+        why_it_matters=str(parsed.get("why_it_matters", "")).strip(),
+        investigation=[str(i) for i in investigation] or [],
+        remediation=[str(r) for r in remediation] or [],
+        uncertainty=str(parsed.get("uncertainty", "")).strip(),
+    )
+
+
 class NVAPIProvider(BaseProvider):
     """Calls an NVIDIA-hosted NIM microservice via the OpenAI-compatible API.
 
@@ -299,6 +346,13 @@ class NVAPIProvider(BaseProvider):
         if not text:
             raise AIError("NVIDIA returned an empty audit insight.")
         return text
+
+    def cve_report(self, facts: str, verdict: str) -> CveReport:
+        prompt = build_cve_report_prompt(facts, verdict) + (
+            "\n\nRespond with STRICT JSON only (no markdown fences, no prose)."
+        )
+        text = self._chat(prompt, temperature=0.2, max_tokens=1024)
+        return _validate_cve_report(_extract_json_object(text))
 
     def _chat(self, prompt: str, temperature: float, max_tokens: int) -> str:
         """POST to NVIDIA NIM, retrying transient 429/5xx with backoff."""
@@ -391,6 +445,55 @@ class MockProvider(BaseProvider):
             "that transcript first: re-run the affected operations with the "
             "exact arguments in the evidence and confirm whether the same "
             "artifact is produced."
+        )
+
+    def cve_report(self, facts: str, verdict: str) -> CveReport:
+        import json as _json
+
+        try:
+            v = _json.loads(verdict)
+        except _json.JSONDecodeError:
+            v = {}
+        priority = v.get("priority", "UNKNOWN")
+        known_exploited = bool(v.get("known_exploited"))
+        explanation = (
+            "Fallback (demo) write-up — live AI is not configured for CVE "
+            f"analysis, so this report is generated deterministically from the "
+            f"verified source data. The engine determined priority {priority}. "
+        )
+        if known_exploited:
+            explanation += (
+                "The CISA KEV catalog confirms this vulnerability is being "
+                "exploited in the wild; treat patching as urgent."
+            )
+        else:
+            explanation += (
+                "This record is vulnerability intelligence from NIST NVD, not "
+                "evidence of an intrusion in this environment."
+            )
+        return CveReport(
+            explanation=explanation,
+            why_it_matters=(
+                "Insufficient evidence." if not known_exploited else
+                "Actively exploited per CISA KEV — assets running affected "
+                "versions are exposed to real-world attacks today."
+            ),
+            investigation=[
+                "Inventory which systems may run affected versions of the listed products.",
+                "Review exposure of those systems to the internet and to internal users.",
+                "Escalate to the asset owner for a patch window decision.",
+            ],
+            remediation=[
+                "Apply the vendor's fixed version if a reference/advisory is listed.",
+                "Where a patch is unavailable, apply the CISA KEV required action or "
+                "compensating controls.",
+                "Re-scan after patching to confirm the vulnerability is remediated.",
+            ],
+            uncertainty=(
+                "Insufficient evidence." 
+                if not known_exploited
+                else "Additional details (mitigations, product versions) require a vendor advisory."
+            ),
         )
 
 

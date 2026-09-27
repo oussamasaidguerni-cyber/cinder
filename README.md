@@ -66,6 +66,51 @@ GEMINI_MODEL=gemini-3.5-flash-lite
 - The AI is never allowed to change the severity/verdict — it only improves the
   wording of the summary, actions, false-positive indicators, and report.
 
+## Threat intelligence (real data)
+
+The **Threat intel** panel (header button) is the "credible security
+intelligence from real public sources" part of the story. Every CVE lookup is
+backed by authoritative, labeled data:
+
+- **NIST NVD** — the CVE record (description, CVSS, CWE, affected products,
+  references) is fetched live from the official NVD API v2, or replayed from
+  the local cache and clearly labeled `CACHED` (with the original retrieval
+  timestamp). `?force=true` re-fetches.
+- **CISA KEV** — the Known Exploited Vulnerabilities catalog is the
+  ground-truth "exploited in the wild" signal (confirmed exploit activity, not
+  a guess by the AI). The catalog is refreshed at most every 6h.
+- **MITRE ATT&CK** — technique metadata (IDs, names, tactics, descriptions,
+  canonical URLs) is real, from attack.mitre.org. The *CVE → technique*
+  association is CINDER's deterministic reasoning from the CWE class, and
+  every association prints an auditable **basis** line. Unknown CWE classes map
+  to nothing rather than something random.
+
+Each finding returns:
+
+- `data_kind: live | cached` plus `retrieved_at` and a cache note
+- a deterministic, explainable **priority verdict** whose formula and exact
+  thresholds are shown in the UI (`why` reasons per point awarded; KEV
+  membership boosts the score and flags `known_exploited`)
+- an AI-narrated analyst report that must only use the verified facts above —
+  missing data is answered with `Insufficient evidence.`, and when the AI is
+  down the report is a labeled deterministic template
+- **provenance** — every section names its source; a live/fallback failure
+  returns an error rather than fabricated intelligence
+
+Anti-fabrication rule: if the live NVD source is unreachable and there is no
+cached record, CINDER returns an explicit 502 — it will never invent a CVE
+record, CVSS score, or exploit claim. Simulated alert data is now explicitly
+tagged `SYNTHETIC` in the UI so it can't be confused with the real intelligence
+path.
+
+```bash
+# endpoints
+GET /intel/search?q=<keyword>      # real NVD keyword search, KEV-tagged
+GET /intel/cves/<CVE_ID>[?force=1] # full intelligence package
+GET /intel/sources                 # provenance + cache status
+GET /intel/stats                   # real counters from the processed-CVE cache
+```
+
 ## Demo flow (90 seconds)
 
 1. Dashboard auto-analyzes all alerts — each row shows an **AI verdict chip**
@@ -132,16 +177,28 @@ GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 backend/app/
   main.py          FastAPI app, startup seeding, CORS
-  routes/          health, alerts (list/detail/analyze/stats/simulate), audit
+  routes/          health, alerts, audit, intel (NVD/KEV/ATT&CK endpoints)
+  intel/           nvd.py, kev.py, attck.py, engine.py, pipeline.py
   services/        engine (deterministic), mitre map, analyzer, simulator, audit
   ai/              provider.py (NVIDIA NIM + Gemini + fallback), prompts.py
-  schemas/         pydantic models (Alert, AnalysisResult, Audit*, Stats...)
-  data/            SQLite store + demo seed (alerts + agent-run audit trail)
+  schemas/         pydantic models (Alert, AnalysisResult, Audit*, Intel*, Stats...)
+  data/            SQLite store (alerts, audit_log, intel_cve_cache, intel_kev_*)
+                   + demo seed (alerts + agent-run audit trail)
 frontend/src/
   api.ts           typed API client
   components/      Logo, AlertTable, Investigation, TriageModal, AuditorModal,
-                   HowItWorks, Cards, Badges
+                   IntelModal, HowItWorks, Cards, Badges
   App.tsx          layout, KPI + navigation (hash-based routes)
+
+## Intel API
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/intel/search?q=` | real NVD keyword search, KEV membership tagged |
+| GET | `/intel/cves/{id}?force=&ai=` | full package: sources, verdict, ATT&CK, AI report |
+| GET | `/intel/sources` | provenance + cache health |
+| GET | `/intel/stats` | processed-CVE counters (real) |
+```
 
 ## Auditor API
 
@@ -164,9 +221,13 @@ frontend/src/
 | POST | `/alerts/analyze-raw` | triage freeform raw log text |
 | PATCH | `/alerts/{id}/status` | update workflow status |
 | POST | `/alerts/{id}/ask` | free-text questions about an alert |
-| POST | `/alerts/simulate` | inject a fresh fabricated alert (demo) |
+| POST | `/alerts/simulate` | inject a fresh fabricated alert (demo, labeled SYNTHETIC) |
 | GET | `/audit` | Auditor: ranked hidden failures, groups, evidence, cost |
 | GET | `/audit/entries` | raw agent-run transcript |
+| GET | `/intel/search?q=` | real NVD keyword search |
+| GET | `/intel/cves/{id}` | full CVE intelligence package (NVD + KEV + ATT&CK) |
+| GET | `/intel/sources` | provenance and cache status |
+| GET | `/intel/stats` | processed-CVE counters |
 
 Interactive docs: http://127.0.0.1:8000/docs
 
@@ -198,7 +259,7 @@ Notes:
 cd backend && python -m pytest -q
 ```
 
-The suite (currently 15 tests) asserts the two promises that make it safe to
+The suite (currently 32 tests) asserts the promises that make it safe to
 trust:
 
 - **The Auditor finds the right things and nothing else.** The seeded synthetic
@@ -209,6 +270,13 @@ trust:
   `fallback/deterministic` labels; a configured-but-failing provider → a
   complete engine verdict with `analysis_mode="fallback"`; NVIDIA takes
   precedence over Gemini; `NVIDIA_MODEL` overrides the default.
+- **Intel is deterministic, explainable, and never fabricated.** Scoring
+  rewards KEV membership with auditable reasons and exact thresholds; CPE/CWE
+  parsing matches the real NVD shape; unknown CWE classes produce no ATT&CK
+  mapping; the cache serves `cached` records with provenance and re-fetches on
+  `force`; on source outage the pipeline serves the previously cached record
+  (labeled) or raises instead of inventing; and the AI fallback report refuses
+  to claim exploitation without a KEV record.
 
 Operating notes: provider calls retry 429/5xx with backoff; every AI result
 carries its real provider/mode label; detection runtime and LLM token cost are
@@ -217,9 +285,15 @@ network calls.
 
 ## Responsible AI + data
 
-- **Fabricated data only** — every alert and the entire audit trail are synthetic
-  (RFC 5737 TEST-NET IP ranges, no real infrastructure, credentials, malware or
-  attack systems). It is labeled "demo data" in the app.
+- **Fabricated data is labeled** — every simulated alert and the entire audit
+  trail are synthetic (RFC 5737 TEST-NET IP ranges, no real infrastructure,
+  credentials, malware or attack systems) and are now explicitly tagged
+  `SYNTHETIC` in the UI.
+- **Real intelligence is real and labeled** — the Threat intel panel uses
+  actual NIST NVD, CISA KEV and MITRE ATT&CK data. Every finding says `LIVE` or
+  `CACHED`, cites its sources, and shows `Insufficient evidence.` when data is
+  missing. CINDER never fabricates a CVE record, score, exploit claim, or
+  ATT&CK association (unknown classes map to nothing).
 - **Human oversight** — the deterministic engine owns every verdict; the AI may
   only phrase the narrative and never the decision. Analysts set workflow status
   and review ambiguous cases explicitly surfaced by the Auditor. The Auditor

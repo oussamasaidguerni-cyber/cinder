@@ -11,6 +11,7 @@ from .data.store import AlertStore
 from .routes.alerts import router as alerts_router
 from .routes.audit import router as audit_router
 from .routes.health import router as health_router
+from .routes.intel import router as intel_router
 
 app = FastAPI(
     title="CINDER — AI-Powered SOC Analyst Copilot",
@@ -29,6 +30,7 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(alerts_router)
 app.include_router(audit_router)
+app.include_router(intel_router)
 
 # Serve the built React frontend so the whole app is ONE service (cloud deploy).
 # In local dev the frontend is served by Vite at :5173 instead; both keep working.

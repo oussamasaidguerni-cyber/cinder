@@ -1,0 +1,1 @@
+"""Real vulnerability-intelligence layer: NVD, CISA KEV, MITRE ATT&CK."""

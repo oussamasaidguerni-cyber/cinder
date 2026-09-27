@@ -26,6 +26,11 @@ function buildSteps(providerLabel: string) {
       title: 'AI narrates, never decides',
       body: `CINDER sends the verdict to ${aiName} to write the narrative summary, recommended actions, false-positive indicators and an incident report.`,
     },
+    {
+      label: '4 · Threat intelligence',
+      title: 'Real public data, labeled honestly',
+      body: 'The Threat intel panel pulls real NIST NVD records, the CISA KEV catalog and MITRE ATT&CK. Every result shows LIVE or CACHED, where each fact came from, and an explainable deterministic verdict. AI only narrates verified evidence.',
+    },
   ]
 }
 
@@ -36,8 +41,9 @@ function buildPrinciples(providerLabel: string) {
       : 'Gemini or NVIDIA Nemotron'
   return [
     ['Analysis modes', `Every result shows how it was produced: live AI (${aiName}), deterministic engine, or honest fallback.`],
-    ['No fake alerts', 'Demo data uses RFC 5737 TEST-NET IPs that can never belong to real infrastructure.'],
-    ['Explainable', 'Evidence lines and MITRE mappings are derived from the log itself, not hallucinated.'],
+    ['Real vs demo', 'Threat intelligence is real public data (NVD/KEV/ATT&CK), labeled LIVE or CACHED. Simulated alerts are labeled SYNTHETIC.'],
+    ['No fabricated intel', 'If a live source is down and no cache exists, CINDER says “insufficient evidence” instead of inventing.'],
+    ['Explainable', 'Evidence lines, MITRE mappings, and verdict reasons are derived from the log or source record, never hallucinated.'],
   ] as const
 }
 
