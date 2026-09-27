@@ -41,6 +41,7 @@ export function AuditorModal({ onClose }: Props) {
   }
 
   useEffect(() => {
+    load()
     api
       .auditEntries()
       .then((r) => setEntries(r))
