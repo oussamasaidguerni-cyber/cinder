@@ -66,3 +66,28 @@ export interface BatchAnalysisItem {
   alert_id: string
   result: AnalysisResult
 }
+
+export interface CorrelationPhase {
+  order: number
+  phase_name: string
+  tactic: string
+  technique_id: string
+  technique_name: string
+  alert_id: string
+  severity: Severity
+  confidence: number
+  timestamp: string
+  evidence: string[]
+}
+
+export interface CorrelatedIncident {
+  incident_id: string
+  title: string
+  confidence: number
+  phases: CorrelationPhase[]
+  verdict: string
+  overview: string
+  recommended_actions: string[]
+  analysis_mode: 'deterministic' | 'ai' | 'fallback'
+  model_used: string | null
+}

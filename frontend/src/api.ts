@@ -5,6 +5,7 @@ import type {
   AnalysisResult,
   AskResponse,
   BatchAnalysisItem,
+  CorrelatedIncident,
   Health,
   Severity,
   Stats,
@@ -55,4 +56,5 @@ export const api = {
     patch<Alert>(`/alerts/${id}/status`, { status }),
   ask: (id: string, question: string) =>
     post<AskResponse>(`/alerts/${id}/ask`, { question }),
+  correlate: () => post<CorrelatedIncident>('/alerts/correlate'),
 }

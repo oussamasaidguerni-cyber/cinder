@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api } from './api'
-import type { AnalysisResult, Health, Stats } from './types'
+import type { AnalysisResult, CorrelatedIncident, Health, Stats } from './types'
 import { AlertTable } from './components/AlertTable'
 import { KpiCards, SeverityDistribution, StatusDistribution } from './components/Cards'
+import { CorrelationModal } from './components/CorrelationModal'
 import { HowItWorks } from './components/HowItWorks'
 import { Investigation } from './components/Investigation'
 import { Logo } from './components/Logo'
@@ -20,6 +21,10 @@ export default function App() {
   const [lastTriage, setLastTriage] = useState<AnalysisResult | null>(null)
   const [simulating, setSimulating] = useState(false)
   const [simError, setSimError] = useState<string | null>(null)
+  const [corrOpen, setCorrOpen] = useState(false)
+  const [correlating, setCorrelating] = useState(false)
+  const [incident, setIncident] = useState<CorrelatedIncident | null>(null)
+  const [corrError, setCorrError] = useState<string | null>(null)
 
   const open = (id: string) => {
     window.location.hash = id
@@ -77,6 +82,30 @@ export default function App() {
     }
   }
 
+  const openCorrelation = async () => {
+    setCorrOpen(true)
+    setCorrelating(true)
+    setCorrError(null)
+    try {
+      const inc = await api.correlate()
+      setIncident(inc)
+    } catch (e: unknown) {
+      setCorrError(
+        e instanceof Error
+          ? 'Correlation unavailable — ' + e.message
+          : 'Correlation failed',
+      )
+      setIncident(null)
+    } finally {
+      setCorrelating(false)
+    }
+  }
+
+  const openFromIncident = (alertId: string) => {
+    setCorrOpen(false)
+    open(alertId)
+  }
+
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-cinder-border bg-cinder-bg/95 backdrop-blur">
@@ -125,7 +154,7 @@ export default function App() {
         </div>
       </header>
 
-      {(triageOpen || howOpen) && (
+      {(triageOpen || howOpen || corrOpen) && (
         <>
           {triageOpen && (
             <TriageModal
@@ -134,6 +163,33 @@ export default function App() {
             />
           )}
           {howOpen && <HowItWorks onClose={() => setHowOpen(false)} />}
+          {corrOpen &&
+            (incident ? (
+              <CorrelationModal
+                incident={incident}
+                key={incident.incident_id}
+                onClose={() => setCorrOpen(false)}
+                onOpenAlert={openFromIncident}
+              />
+            ) : correlating ? (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+                <div className="rounded-xl border border-cinder-border bg-cinder-panel p-6 text-sm text-cinder-muted">
+                  Correlating alerts…
+                </div>
+              </div>
+            ) : (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+                <div className="flex max-w-md flex-col gap-3 rounded-xl border border-cinder-border bg-cinder-panel p-6 text-sm text-yellow-400">
+                  {corrError ?? 'Correlation unavailable.'}
+                  <button
+                    onClick={() => setCorrOpen(false)}
+                    className="self-start rounded border border-cinder-border px-3 py-1 text-xs text-cinder-muted hover:text-cinder-text"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ))}
         </>
       )}
 
@@ -181,6 +237,25 @@ export default function App() {
               <div className="flex flex-col gap-4">
                 <SeverityDistribution stats={stats} />
                 <StatusDistribution stats={stats} />
+                <div className="rounded-lg border border-cinder-border bg-cinder-panel p-4">
+                  <div className="mb-1 text-[11px] uppercase tracking-wider text-cinder-muted">
+                    Correlated campaign
+                  </div>
+                  <p className="text-sm text-cinder-muted">
+                    Three alerts may be one intrusion: Initial Access → Execution →
+                    Command &amp; Control.
+                  </p>
+                  <button
+                    onClick={openCorrelation}
+                    disabled={correlating}
+                    className="mt-3 w-full rounded border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-500/20 disabled:opacity-50"
+                  >
+                    {correlating ? 'Correlating…' : 'View attack chain'}
+                  </button>
+                  {corrError && (
+                    <div className="mt-2 text-[11px] text-yellow-400">{corrError}</div>
+                  )}
+                </div>
               </div>
             </div>
           </div>

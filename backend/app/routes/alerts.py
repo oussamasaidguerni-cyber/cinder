@@ -9,6 +9,7 @@ from ..schemas.alerts import (
     StatsResponse,
 )
 from ..schemas.analysis import AnalysisResult
+from ..schemas.correlation import CorrelatedIncident
 from ..schemas.requests import (
     AskRequest,
     AskResponse,
@@ -21,6 +22,7 @@ from ..services.analyzer import (
     analyze_raw_log,
     ask_question,
 )
+from ..services.correlation import correlate_chain
 from ..services.simulator import simulate_alert
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
@@ -77,6 +79,19 @@ def get_alert(alert_id: str) -> Alert:
     if alert is None:
         raise HTTPException(status_code=404, detail="Alert not found")
     return alert
+
+
+@router.post("/correlate", response_model=CorrelatedIncident)
+def correlate_alerts() -> CorrelatedIncident:
+    """Build a multi-alert kill-chain incident from related alerts present."""
+    store = _get_store()
+    try:
+        try:
+            return correlate_chain(store)
+        except LookupError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+    finally:
+        store.close()
 
 
 @router.post("/{alert_id}/analyze", response_model=AnalysisResult)

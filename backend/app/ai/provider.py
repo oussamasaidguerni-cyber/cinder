@@ -16,7 +16,7 @@ import urllib.request
 from dataclasses import dataclass
 
 from ..schemas.analysis import AnalysisResult
-from .prompts import build_enrichment_prompt, build_question_prompt
+from .prompts import build_enrichment_prompt, build_incident_prompt, build_question_prompt
 
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
@@ -44,6 +44,9 @@ class BaseProvider:
         raise NotImplementedError
 
     def answer(self, alert, result: AnalysisResult, question: str) -> str:
+        raise NotImplementedError
+
+    def incident_overview(self, facts: str) -> str:
         raise NotImplementedError
 
 
@@ -94,6 +97,23 @@ class GeminiProvider(BaseProvider):
             raise AIError("Gemini returned an unexpected or non-JSON payload.") from exc
         if not text:
             raise AIError("Gemini returned an empty answer.")
+        return text
+
+    def incident_overview(self, facts: str) -> str:
+        payload = {
+            "contents": [{"parts": [{"text": build_incident_prompt(facts)}]}],
+            "generationConfig": {
+                "temperature": 0.3,
+                "maxOutputTokens": 512,
+            },
+        }
+        body = self._call_gemini(payload)
+        try:
+            text = body["candidates"][0]["content"]["parts"][0]["text"].strip()
+        except (KeyError, IndexError) as exc:
+            raise AIError("Gemini returned an unexpected or non-JSON payload.") from exc
+        if not text:
+            raise AIError("Gemini returned an empty incident overview.")
         return text
 
     def _call_gemini(self, payload: dict) -> dict:
@@ -174,6 +194,15 @@ class MockProvider(BaseProvider):
             f"{result.confidence}%). Recommended next step: "
             f"{result.recommended_actions[0] if result.recommended_actions else 'review the alert.'} "
             "Add a GEMINI_API_KEY to get live answers to questions like yours."
+        )
+
+    def incident_overview(self, facts: str) -> str:
+        return (
+            "Fallback (demo) mode — live AI is not configured. Correlation is "
+            "based on the deterministic engine's per-phase verdicts above: the "
+            "alerts share a plausible stage sequence and should be treated as "
+            "one investigation priority. Add a GEMINI_API_KEY for a live "
+            "AI-narrated incident overview."
         )
 
 

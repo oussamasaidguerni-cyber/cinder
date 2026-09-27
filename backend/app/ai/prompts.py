@@ -47,6 +47,25 @@ Rules:
 """
 
 
+def build_incident_prompt(facts: str) -> str:
+    return f"""You are CINDER, a cautious Tier-1 SOC analyst assistant.
+
+A correlation engine grouped several alerts into ONE incident hypothesis
+(kill-chain). The phases and evidence below are ENGINE-GENERATED and
+authoritative. Your ONLY job is to phrase a short, cautious narrative. Do NOT
+add techniques, severity, or certainty that are not already in the facts.
+
+CORRELATED FACTS:
+{facts}
+
+Return a plain-text incident overview of 3-6 sentences:
+- Describe the attack chain stage by stage (e.g. "the attacker first ... then ... finally ...").
+- Use 'likely', 'potentially', or 'evidence suggests' where appropriate. Stay defensive.
+- State clearly this is a correlation hypothesis, not proof.
+- Do NOT recommend attacking, exploiting, or disabling third-party systems.
+"""
+
+
 def build_question_prompt(alert, result: AnalysisResult, question: str) -> str:
     return f"""You are CINDER, a cautious Tier-1 SOC analyst assistant.
 
