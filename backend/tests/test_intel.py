@@ -16,9 +16,11 @@ from app.ai.provider import MockProvider
 from app.data.store import AlertStore
 from app.intel import attck
 from app.intel.engine import analyze as score_cve
+from app.intel.engine import match_inventory
 from app.intel.nvd import parse_cve_json
 from app.intel.pipeline import Pipeline
 from app.schemas.intel import CvssMetric, IntelFinding, IntelMetrics, IntelSearchResult, KevEntry
+from app.services.ingestion import ingest_raw_log
 
 
 # ---------------------------------------------------------------------------
@@ -361,3 +363,124 @@ def test_finding_model_roundtrip():
     data = finding.model_dump()
     assert data["verdict"]["priority"] == "CRITICAL"
     assert data["data_kind"] == "live"
+
+
+# ---------------------------------------------------------------------------
+# inventory awareness: "does this CVE affect OUR environment?"
+# ---------------------------------------------------------------------------
+
+
+def test_match_inventory_no_inventory_never_claims():
+    got = match_inventory(
+        [
+            mock_affected("cpe:2.3:a:apache:log4j:2.0:*:*:*:*:*:*:*", "apache", "log4j"),
+        ],
+        inventory=[],
+    )
+    assert got["configured"] is False
+    assert got["match_status"] == "NO_INVENTORY"
+    assert got["matched_cpes"] == []
+
+
+def test_match_inventory_hit_is_honest():
+    got = match_inventory(
+        [
+            mock_affected("cpe:2.3:a:apache:log4j:2.0:*:*:*:*:*:*:*", "apache", "log4j"),
+            mock_affected("cpe:2.3:a:apache:tomcat:9.0:*:*:*:*:*:*:*", "apache", "tomcat"),
+        ],
+        inventory=[("apache", "log4j")],
+    )
+    assert got["configured"] is True
+    assert got["match_status"] == "IN_INVENTORY"
+    assert got["matched_cpes"] == ["cpe:2.3:a:apache:log4j:2.0:*:*:*:*:*:*:*"]
+    assert got["matched_products"] == ["apache:log4j"]
+
+
+def test_match_inventory_configured_but_no_hit():
+    got = match_inventory(
+        [
+            mock_affected("cpe:2.3:a:apache:tomcat:9.0:*:*:*:*:*:*:*", "apache", "tomcat"),
+        ],
+        inventory=[("paloaltonetworks", "pan-os")],
+    )
+    assert got["configured"] is True
+    assert got["match_status"] == "NOT_IN_INVENTORY"
+    assert got["matched_cpes"] == []
+
+
+def test_pipeline_propagates_inventory_awareness(tmp_path, monkeypatch):
+    monkeypatch.setenv("CINDER_INVENTORY", "apache:log4j")
+    store = _mk_store(tmp_path)
+    pipe = _mk_pipe(store)
+    finding = pipe.analyze("CVE-2021-44228")
+    assert finding.inventory is not None
+    assert finding.inventory.configured is True
+    assert finding.inventory.match_status == "IN_INVENTORY"
+    assert "apache:log4j" in finding.inventory.matched_products
+
+
+def test_pipeline_present_unknown_inventory_when_unconfigured(tmp_path, monkeypatch):
+    monkeypatch.delenv("CINDER_INVENTORY", raising=False)
+    store = _mk_store(tmp_path)
+    pipe = _mk_pipe(store)
+    finding = pipe.analyze("CVE-2021-44228")
+    assert finding.inventory is not None
+    assert finding.inventory.match_status == "NO_INVENTORY"
+
+
+def mock_affected(cpe, vendor, product):
+    from app.schemas.intel import AffectedProduct
+
+    return AffectedProduct(cpe=cpe, vendor=vendor, product=product)
+
+
+# ---------------------------------------------------------------------------
+# real ingestion: /alerts/ingest behavior
+# ---------------------------------------------------------------------------
+
+
+def test_ingest_detects_and_creates_alert(tmp_path):
+    store = AlertStore(str(tmp_path / "ingest.db"))
+    try:
+        alert, kind = ingest_raw_log(
+            store,
+            raw_log=(
+                "Mar 10 23:14:15 srv-web sshd[32010]: Failed password for "
+                "invalid user admin from 203.0.113.45 port 59224 ssh2"
+            ),
+            source="corp-firewall",
+            source_ip="203.0.113.45",
+        )
+        assert kind == "detected"
+        assert alert.alert_type.value == "SSH_BRUTE_FORCE"
+        assert alert.severity.value == "HIGH"
+        assert alert.id.startswith("AL-")
+        assert store.get_alert(alert.id) is not None
+    finally:
+        store.close()
+
+
+def test_ingest_accepts_explicit_sender_type(tmp_path):
+    store = AlertStore(str(tmp_path / "ingest2.db"))
+    try:
+        alert, kind = ingest_raw_log(
+            store,
+            raw_log="any raw text, type comes from the sender",
+            alert_type="PHISHING",
+        )
+        assert kind == "explicit"
+        assert alert.alert_type.value == "PHISHING"
+        assert alert.severity.value == "MEDIUM"
+    finally:
+        store.close()
+
+
+def test_ingest_rejects_unrecognized_pattern(tmp_path):
+    store = AlertStore(str(tmp_path / "ingest3.db"))
+    try:
+        n_before = store.count()
+        with pytest.raises(ValueError):
+            ingest_raw_log(store, raw_log="qwerty jibberish no known pattern here")
+        assert store.count() == n_before
+    finally:
+        store.close()

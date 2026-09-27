@@ -53,7 +53,9 @@ if (_STATIC / "index.html").exists():
 def startup_seed() -> None:
     store = AlertStore("data/cinder.db")
     try:
-        if store.count() == 0:
+        # Fabricated demo alerts are OPT-IN. Set CINDER_DEMO_MODE=0 (or unset)
+        # for a clean deployment fed only by /alerts/ingest / /alerts/simulate.
+        if store.count() == 0 and os.getenv("CINDER_DEMO_MODE", "1") != "0":
             store.replace_all(seed_alerts())
         # Seed the agent-run trail so the Auditor demo has transcript on first load.
         store.ensure_audit_seeded()

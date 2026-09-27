@@ -102,6 +102,15 @@ class IntelMetrics(BaseModel):
     total_ms: int = 0
 
 
+class InventoryMatch(BaseModel):
+    configured: bool = False
+    match_status: str = Field(
+        description="NO_INVENTORY | IN_INVENTORY | NOT_IN_INVENTORY"
+    )
+    matched_cpes: list[str] = Field(default_factory=list)
+    matched_products: list[str] = Field(default_factory=list)
+
+
 class IntelFinding(BaseModel):
     cve_id: str
     data_kind: str
@@ -122,6 +131,13 @@ class IntelFinding(BaseModel):
 
     kev: KevEntry = Field(default_factory=KevEntry)
     attck: list[AttckTechnique] = Field(default_factory=list)
+    inventory: InventoryMatch | None = Field(
+        default=None,
+        description=(
+            "Does this CVE affect the operator's configured inventory? "
+            "NO_INVENTORY means we cannot say — never a fabricated hit."
+        ),
+    )
 
     verdict: IntelVerdict | None = None
     report: IntelReport | None = None

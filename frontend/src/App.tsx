@@ -188,6 +188,7 @@ export default function App() {
             <TriageModal
               onClose={() => setTriageOpen(false)}
               onResult={(r) => setLastTriage(r)}
+              onIngested={refresh}
             />
           )}
           {howOpen && <HowItWorks onClose={() => setHowOpen(false)} providerLabel={aiProviderLabel} />}

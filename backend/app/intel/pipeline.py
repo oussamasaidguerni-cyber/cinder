@@ -34,10 +34,12 @@ from ..schemas.intel import (
     IntelReport,
     IntelSourcesResponse,
     IntelStatsResponse,
+    InventoryMatch,
     KevEntry,
 )
 from . import attck
 from .engine import analyze as score_cve
+from .engine import match_inventory
 from .kev import KevClient, KevError
 from .nvd import _NvdClient, NvdError, parse_cve_json
 
@@ -134,6 +136,7 @@ class Pipeline:
             references=parsed.get("references", []),
             kev=kev,
             attck=[AttckTechnique(**t) for t in attck_list],
+            inventory=InventoryMatch(**match_inventory(parsed.get("affected_products", []))),
             verdict=verdict,
             report=report,
             metrics=metrics,

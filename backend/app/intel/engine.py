@@ -104,6 +104,78 @@ def _formula(cvss: CvssMetric | None, known_exploited: bool) -> str:
     return "; ".join(parts)
 
 
+def inventory_tokens() -> list[tuple[str, str]]:
+    """Parse the env-configured inventory as (vendor, product) pairs.
+
+    Format: comma-separated `vendor:product` tokens, e.g.
+    CINDER_INVENTORY="paloaltonetworks:pan-os,apache:log4j,apache:http_server"
+    Unknown/empty -> [] (meaning: no inventory configured).
+    """
+    raw = os.environ.get("CINDER_INVENTORY", "").strip()
+    tokens: list[tuple[str, str]] = []
+    for item in raw.split(","):
+        item = item.strip()
+        if not item or ":" not in item:
+            continue
+        vendor, _, product = item.partition(":")
+        tokens.append((vendor.strip().lower(), product.strip().lower()))
+    return tokens
+
+
+def match_inventory(
+    affected_products: list,
+    inventory: list[tuple[str, str]] | None = None,
+) -> dict:
+    """Does this CVE affect anything the operator has told us they run?
+
+    Returns an honest, three-state answer:
+      NO_INVENTORY     -> operator configured no inventory; we cannot say.
+      IN_INVENTORY     -> at least one affected vendor:product is in inventory.
+      NOT_IN_INVENTORY -> inventory is configured but nothing matches.
+    No match logic means no claim; absent data never fabricates a hit.
+    """
+    if inventory is None:
+        inventory = inventory_tokens()
+    if not inventory:
+        return {
+            "configured": False,
+            "match_status": "NO_INVENTORY",
+            "matched_cpes": [],
+            "matched_products": [],
+        }
+    matched_cpes: list[str] = []
+    matched_products: list[str] = []
+    for p in affected_products:
+        vendor = (p.vendor or "").lower()
+        product = (p.product or "").lower()
+        if not vendor or not product:
+            continue
+        for iv, ip in inventory:
+            if vendor == iv and product == ip:
+                cpe = p.cpe if isinstance(p, dict) else getattr(p, "cpe", None)
+                if cpe and cpe not in matched_cpes:
+                    matched_cpes.append(cpe)
+                label = f"{vendor}:{product}"
+                if label not in matched_products:
+                    matched_products.append(label)
+                break
+            # Product-only match ("apache" matches "apache:log4j", "apache:http_server")
+            if ip and product == ip and iv == "*":
+                cpe = p.cpe if isinstance(p, dict) else getattr(p, "cpe", None)
+                if cpe and cpe not in matched_cpes:
+                    matched_cpes.append(cpe)
+                label = f"{vendor}:{product}"
+                if label not in matched_products:
+                    matched_products.append(label)
+                break
+    return {
+        "configured": True,
+        "match_status": "IN_INVENTORY" if matched_cpes else "NOT_IN_INVENTORY",
+        "matched_cpes": matched_cpes,
+        "matched_products": matched_products,
+    }
+
+
 def analyze(cvss: CvssMetric | None, kev: KevEntry) -> IntelVerdict:
     reasons: list[str] = []
 

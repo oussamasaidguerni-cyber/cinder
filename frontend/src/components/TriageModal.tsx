@@ -6,6 +6,7 @@ import { SeverityBadge } from './Badges'
 interface Props {
   onClose: () => void
   onResult: (r: AnalysisResult) => void
+  onIngested: () => void
 }
 
 const SAMPLES: Record<string, string> = {
@@ -18,11 +19,13 @@ function modeTone(m: AnalysisResult['analysis_mode']) {
   return m === 'ai' ? 'text-emerald-400' : m === 'fallback' ? 'text-yellow-400' : 'text-sky-400'
 }
 
-export function TriageModal({ onClose, onResult }: Props) {
+export function TriageModal({ onClose, onResult, onIngested }: Props) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [savedId, setSavedId] = useState<string | null>(null)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -40,10 +43,29 @@ export function TriageModal({ onClose, onResult }: Props) {
       const r = await api.analyzeRaw(payload)
       setResult(r)
       onResult(r)
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Triage failed')
+} catch (e: unknown) {
+      setError(e instanceof Error ? 'Triage failed' : 'Triage failed')
     } finally {
       setBusy(false)
+    }
+  }
+
+  const save = async () => {
+    if (!text.trim() || saving) return
+    setSaving(true)
+    setError(null)
+    try {
+      const a = await api.ingest({ raw_log: text, source: 'analyst-paste' })
+      setSavedId(a.id)
+      onIngested()
+    } catch (e: unknown) {
+      setError(
+        e instanceof Error
+          ? `Ingest rejected: ${e.message}. CINDER won't classify unknown patterns — analyze it or pass a type.`
+          : 'Ingest failed',
+      )
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -91,6 +113,18 @@ export function TriageModal({ onClose, onResult }: Props) {
           >
             {busy ? 'Analyzing…' : 'Analyze'}
           </button>
+          <button
+            onClick={save}
+            disabled={saving || !text.trim()}
+            className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save as real alert'}
+          </button>
+          {savedId && (
+            <span className="text-xs text-emerald-400">
+              ingested as <span className="font-mono">{savedId}</span> — it's now in the queue
+            </span>
+          )}
           {error && <span className="text-xs text-red-400">{error}</span>}
         </div>
 

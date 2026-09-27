@@ -270,6 +270,54 @@ export function IntelModal({ onClose }: { onClose: () => void }) {
                 </div>
               )}
 
+              {finding.inventory && finding.inventory.match_status === 'IN_INVENTORY' && (
+                <div className="rounded border border-red-500/40 bg-red-500/10 p-3">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-red-300">
+                    Affects our inventory — verify exposure now
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {finding.inventory.matched_products.map((p) => (
+                      <span
+                        key={p}
+                        className="rounded bg-red-500/20 border border-red-500/30 px-2 py-0.5 font-mono text-[11px] text-red-200"
+                      >
+                        {p}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-xs text-cinder-muted">
+                    Matched against the operator-configured inventory
+                    (CINDER_INVENTORY). Vulnerability intelligence that matters to this
+                    environment — still not evidence of compromise.
+                  </p>
+                </div>
+              )}
+
+              {finding.inventory && finding.inventory.match_status === 'NOT_IN_INVENTORY' && (
+                <div className="rounded border border-cinder-border bg-cinder-bg p-3">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+                    Not in our inventory
+                  </div>
+                  <p className="mt-1 text-xs text-cinder-muted">
+                    Inventory configured and this product is not present — no matching
+                    vendor:product in CINDER_INVENTORY.
+                  </p>
+                </div>
+              )}
+
+              {finding.inventory && finding.inventory.match_status === 'NO_INVENTORY' && (
+                <div className="rounded border border-cinder-border bg-cinder-bg p-3">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-cinder-muted">
+                    Irrelevant without context
+                  </div>
+                  <p className="mt-1 text-xs text-cinder-muted">
+                    No inventory configured, so CINDER cannot say whether this affects
+                    your environment. Set CINDER_INVENTORY (e.g.
+                    paloaltonetworks:pan-os,apache:log4j) to get answers that matter to you.
+                  </p>
+                </div>
+              )}
+
               {finding.kev.in_catalog && (
                 <div className="rounded border border-red-500/40 bg-red-500/10 p-3">
                   <div className="text-[11px] font-bold uppercase tracking-wider text-red-300">

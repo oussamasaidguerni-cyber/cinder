@@ -111,6 +111,19 @@ GET /intel/sources                 # provenance + cache status
 GET /intel/stats                   # real counters from the processed-CVE cache
 ```
 
+**Inventory awareness** (real "so what for me"): set `CINDER_INVENTORY` to a
+comma-separated list of the products you actually run, e.g.
+`paloaltonetworks:pan-os,apache:log4j`. Every CVE package then reports
+`IN_INVENTORY` / `NOT_IN_INVENTORY` (or honest `NO_INVENTORY` when unset) so the
+intel panel tells you whether the CVE affects *your* environment, not just the
+world.
+
+**Real signals in:** `POST /alerts/ingest` persists an alert from an actual log
+event — auto-detected from the text or with a sender-supplied `alert_type`.
+Unrecognized patterns are rejected (422) rather than guessed. Fabricated demo
+seeding is opt-in via `CINDER_DEMO_MODE` (default `1` for the demo; set `0` for
+a clean deployment fed only by real ingestion).
+
 ## Demo flow (90 seconds)
 
 1. Dashboard auto-analyzes all alerts — each row shows an **AI verdict chip**
@@ -222,6 +235,7 @@ frontend/src/
 | PATCH | `/alerts/{id}/status` | update workflow status |
 | POST | `/alerts/{id}/ask` | free-text questions about an alert |
 | POST | `/alerts/simulate` | inject a fresh fabricated alert (demo, labeled SYNTHETIC) |
+| POST | `/alerts/ingest` | create an alert from a REAL log event (real signals in) |
 | GET | `/audit` | Auditor: ranked hidden failures, groups, evidence, cost |
 | GET | `/audit/entries` | raw agent-run transcript |
 | GET | `/intel/search?q=` | real NVD keyword search |

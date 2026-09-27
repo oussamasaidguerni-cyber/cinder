@@ -57,6 +57,13 @@ export const api = {
   analyze: (id: string) => post<AnalysisResult>(`/alerts/${id}/analyze`),
   analyzeAll: () => get<BatchAnalysisItem[]>('/alerts/analyze-all'),
   analyzeRaw: (text: string) => post<AnalysisResult>('/alerts/analyze-raw', { text }),
+  ingest: (payload: {
+    raw_log: string
+    source?: string
+    source_ip?: string
+    destination?: string
+    alert_type?: string
+  }) => post<Alert>('/alerts/ingest', payload),
   simulate: () => post<Alert>('/alerts/simulate'),
   updateStatus: (id: string, status: AlertStatus) =>
     patch<Alert>(`/alerts/${id}/status`, { status }),

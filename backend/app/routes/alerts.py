@@ -15,6 +15,7 @@ from ..schemas.requests import (
     AskRequest,
     AskResponse,
     BatchAnalysisItem,
+    IngestRequest,
     RawLogRequest,
     StatusUpdateRequest,
 )
@@ -280,6 +281,44 @@ def simulate() -> Alert:
             mode="deterministic",
             severity=alert.severity.value,
             threat_type=alert.alert_type.value,
+            raw_log=alert.raw_log,
+        )
+        return alert
+    finally:
+        store.close()
+
+
+@router.post("/ingest", response_model=Alert)
+def ingest(req: IngestRequest) -> Alert:
+    """Real signals in: persist an alert from an actual log event.
+
+    Accepts a sender-supplied classification or auto-detects from the text.
+    Unrecognized patterns are rejected (422) rather than mis-labeled.
+    """
+    from ..services.ingestion import ingest_raw_log
+
+    store = _get_store()
+    try:
+        try:
+            alert, _type_source = ingest_raw_log(
+                store,
+                raw_log=req.raw_log,
+                source=req.source,
+                source_ip=req.source_ip,
+                destination=req.destination,
+                alert_type=req.alert_type,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        _audit(
+            session_id=f"sess-live-ing-{alert.id}",
+            op="ingest",
+            alert_id=alert.id,
+            mode="deterministic",
+            severity=alert.severity.value,
+            confidence=None,
+            threat_type=alert.alert_type.value,
+            summary="Real event ingested via /alerts/ingest.",
             raw_log=alert.raw_log,
         )
         return alert

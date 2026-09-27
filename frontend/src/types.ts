@@ -242,6 +242,13 @@ export interface IntelMetrics {
   total_ms: number
 }
 
+export interface InventoryMatch {
+  configured: boolean
+  match_status: 'NO_INVENTORY' | 'IN_INVENTORY' | 'NOT_IN_INVENTORY'
+  matched_cpes: string[]
+  matched_products: string[]
+}
+
 export interface IntelFinding {
   cve_id: string
   data_kind: string
@@ -257,6 +264,7 @@ export interface IntelFinding {
   references: IntelReference[]
   kev: KevEntry
   attck: AttckTechnique[]
+  inventory?: InventoryMatch | null
   verdict: IntelVerdict | null
   report: IntelReport | null
   metrics: IntelMetrics

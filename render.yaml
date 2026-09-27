@@ -19,3 +19,7 @@ services:
         sync: false
       - key: NVD_API_KEY
         sync: false
+      - key: CINDER_DEMO_MODE
+        value: "1"
+      - key: CINDER_INVENTORY
+        value: "paloaltonetworks:pan-os,apache:log4j,apache:http_server,fortinet:fortios"
